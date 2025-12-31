@@ -1,0 +1,53 @@
+# Chaos Dungeon - Task Tracker
+
+## Current Sprint: Foundation
+
+### In Progress
+- [ ] Project structure setup
+
+### To Do (Phase 1 - Foundation)
+- [ ] init-01-project-foundation.md - CDK base stack, DynamoDB, Lambda structure
+- [ ] init-02-character-api.md - Character CRUD endpoints
+- [ ] init-03-session-api.md - Session management endpoints
+- [ ] init-04-frontend-shell.md - Basic React app with routing
+
+### To Do (Phase 2 - Core Game Loop)
+- [ ] init-05-dm-system-prompt.md - DM prompt engineering
+- [ ] init-06-action-handler.md - Process player actions
+- [ ] init-07-game-ui.md - Chat interface with message history
+- [ ] init-08-state-parsing.md - Parse DM responses for state changes
+
+### To Do (Phase 3 - Game Systems)
+- [ ] init-09-combat-system.md - BECMI combat mechanics
+- [ ] init-10-inventory.md - Item management
+- [ ] init-11-dice-rolling.md - Dice mechanics with UI
+- [ ] init-12-leveling.md - XP and level progression
+
+### To Do (Phase 4 - Polish)
+- [ ] init-13-save-slots.md - Multiple characters/campaigns
+- [ ] init-14-session-resume.md - Continue saved games
+- [ ] init-15-character-sheet.md - Detailed character view
+- [ ] init-16-domain-setup.md - chaos.jurigregg.com deployment
+
+### Completed
+- [x] Initial project planning (PLANNING.md)
+- [x] Claude Code instructions (CLAUDE.md)
+
+---
+
+## Notes
+
+### Blockers
+None currently.
+
+### Questions to Resolve
+1. Anonymous sessions vs Cognito auth for MVP?
+2. Preset starting scenarios vs fully procedural?
+
+### Cost Tracking
+- Current estimated monthly: $0 (not deployed)
+- Target: < $20/month
+
+---
+
+*Last updated: 2025-01-01*
