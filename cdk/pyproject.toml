@@ -1,0 +1,22 @@
+[project]
+name = "chaos-dungeon-cdk"
+version = "0.1.0"
+description = "CDK infrastructure for Chaos Dungeon"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["stacks"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v"
+python_files = "test_*.py"
+python_functions = "test_*"

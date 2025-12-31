@@ -3,10 +3,9 @@
 ## Current Sprint: Foundation
 
 ### In Progress
-- [ ] Project structure setup
+- None
 
 ### To Do (Phase 1 - Foundation)
-- [ ] init-01-project-foundation.md - CDK base stack, DynamoDB, Lambda structure
 - [ ] init-02-character-api.md - Character CRUD endpoints
 - [ ] init-03-session-api.md - Session management endpoints
 - [ ] init-04-frontend-shell.md - Basic React app with routing
@@ -32,6 +31,7 @@
 ### Completed
 - [x] Initial project planning (PLANNING.md)
 - [x] Claude Code instructions (CLAUDE.md)
+- [x] init-01-project-foundation.md - CDK base stack, DynamoDB, Lambda structure, Frontend shell
 
 ---
 
@@ -41,7 +41,7 @@
 None currently.
 
 ### Questions to Resolve
-1. Anonymous sessions vs Cognito auth for MVP?
+1. ~~Anonymous sessions vs Cognito auth for MVP?~~ - Resolved: Anonymous sessions per ADR-005
 2. Preset starting scenarios vs fully procedural?
 
 ### Cost Tracking
@@ -50,4 +50,4 @@ None currently.
 
 ---
 
-*Last updated: 2025-01-01*
+*Last updated: 2025-12-31*

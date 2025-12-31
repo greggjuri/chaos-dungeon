@@ -25,7 +25,7 @@ A text-based RPG web game where Claude serves as an intelligent Dungeon Master, 
 
 ```bash
 # Clone the repository
-git clone <repo-url>
+git clone https://github.com/greggjuri/chaos-dungeon
 cd chaos-dungeon
 
 # Backend (Lambdas)
