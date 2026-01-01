@@ -172,8 +172,24 @@ chaos-dungeon/
 2. **Generate Plan**: Run `/generate-prp initials/init-{feature}.md`
 3. **Review**: Check the generated PRP for completeness
 4. **Execute**: Run `/execute-prp prps/prp-{feature}.md`
-5. **Validate**: Run tests, check coverage
-6. **Commit**: `git commit -m "feat: description"` and push
+5. **Unit Tests**: Automated tests must pass (pytest, vitest)
+6. **Deploy**: `cd cdk && cdk deploy --all` (for backend changes)
+7. **Integration Test**: Manual testing against deployed backend
+   - Test happy paths end-to-end
+   - Test error scenarios
+   - Verify browser console has no errors
+   - Check Network tab for correct requests/responses
+8. **Fix Issues**: If bugs found, fix and re-test before proceeding
+9. **Commit**: `git commit -m "feat: description"` and push
+
+### Integration Testing Checklist
+Before marking a PRP complete, verify:
+- [ ] Feature works end-to-end (frontend → API → database → response)
+- [ ] No CORS errors in browser console
+- [ ] No JavaScript errors in browser console
+- [ ] API requests include correct headers (X-User-Id, Content-Type)
+- [ ] Error states display correctly to user
+- [ ] localStorage persists correctly (if applicable)
 
 ## Common Commands
 

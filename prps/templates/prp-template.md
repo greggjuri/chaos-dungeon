@@ -105,6 +105,36 @@ Detailed description of what to implement.
 
 ---
 
+## Integration Test Plan
+
+Manual tests to perform after deployment:
+
+### Prerequisites
+- Backend deployed: `cd cdk && cdk deploy --all`
+- Frontend running: `cd frontend && npm run dev`
+- Browser DevTools open (Console + Network tabs)
+
+### Test Steps
+| Step | Action | Expected Result | Pass? |
+|------|--------|-----------------|-------|
+| 1 | [Action] | [Expected] | ☐ |
+| 2 | [Action] | [Expected] | ☐ |
+| 3 | [Action] | [Expected] | ☐ |
+
+### Error Scenarios
+| Scenario | How to Trigger | Expected Behavior | Pass? |
+|----------|----------------|-------------------|-------|
+| [Error case] | [Steps] | [Expected] | ☐ |
+
+### Browser Checks
+- [ ] No CORS errors in Console
+- [ ] No JavaScript errors in Console
+- [ ] API requests visible in Network tab
+- [ ] Responses are 2xx (not 4xx/5xx)
+- [ ] localStorage values persist after refresh
+
+---
+
 ## Error Handling
 
 ### Expected Errors

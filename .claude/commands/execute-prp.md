@@ -74,6 +74,52 @@ After all implementation steps complete:
    - Re-run tests
    - Continue until all pass
 
+### Step 4.5: Integration Testing (REQUIRED)
+
+After automated tests pass, perform manual integration testing:
+
+1. **Deploy to AWS** (if backend changes):
+   ```bash
+   cd cdk && cdk deploy --all
+   ```
+   Note the API Gateway URL from output.
+
+2. **Update Frontend Config** (if needed):
+   - Ensure `frontend/.env.development` has correct `VITE_API_URL`
+   - No trailing slash on URL
+
+3. **Start Frontend**:
+   ```bash
+   cd frontend && npm run dev
+   ```
+
+4. **Manual Test Checklist**:
+   - [ ] Open browser DevTools (Console + Network tabs)
+   - [ ] Test the primary happy path end-to-end
+   - [ ] Verify no console errors (especially CORS)
+   - [ ] Verify API requests show in Network tab with 2xx responses
+   - [ ] Test at least one error scenario
+   - [ ] Check localStorage is populated correctly (if applicable)
+
+5. **If Issues Found**:
+   - Document the bug
+   - Fix the code
+   - Re-run automated tests
+   - Re-deploy if backend change
+   - Re-test manually
+   - Repeat until clean
+
+6. **Sign-off**: Only proceed to Step 5 when integration tests pass.
+
+**Common Issues to Watch For**:
+| Symptom | Likely Cause |
+|---------|--------------|
+| CORS error | Lambda missing CORSConfig in handler |
+| 404 errors | Wrong API URL or missing route |
+| Network request not firing | JavaScript error, check Console |
+| localStorage null | Hook not persisting initial value |
+| Double slash in URL | Trailing slash in VITE_API_URL |
+
 ### Step 5: Update Documentation
 
 1. Update `docs/TASK.md`:

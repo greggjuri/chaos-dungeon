@@ -49,6 +49,7 @@ Fill in all sections:
 7. **Error Handling**: Edge cases and failure scenarios
 8. **Cost Impact**: Estimate Claude API and AWS costs
 9. **Open Questions**: Anything that needs clarification
+10. **Integration Test Plan**: Specific manual tests to verify feature works end-to-end
 
 ### Step 5: Score Confidence
 
