@@ -2,17 +2,19 @@
 
 Contains:
 - API Gateway REST API with CORS
+- Character Lambda function
 - Stage configuration for dev/prod
 """
-from aws_cdk import CfnOutput, Stack
+from aws_cdk import CfnOutput, Duration, Stack
 from aws_cdk import aws_apigateway as apigw
+from aws_cdk import aws_lambda as lambda_
 from constructs import Construct
 
 from .base_stack import ChaosBaseStack
 
 
 class ChaosApiStack(Stack):
-    """API infrastructure stack with API Gateway."""
+    """API infrastructure stack with API Gateway and Lambda functions."""
 
     def __init__(
         self,
@@ -37,11 +39,42 @@ class ChaosApiStack(Stack):
         self.prefix = f"chaos-{environment}"
         self.base_stack = base_stack
 
-        # Create resources
+        # Create Lambda functions
+        self.character_function = self._create_character_lambda()
+
+        # Create API Gateway
         self.api = self._create_api()
 
         # Export outputs
         self._create_outputs()
+
+    def _create_character_lambda(self) -> lambda_.Function:
+        """Create the character handler Lambda function."""
+        function = lambda_.Function(
+            self,
+            "CharacterHandler",
+            function_name=f"{self.prefix}-character",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="character.handler.lambda_handler",
+            code=lambda_.Code.from_asset("../lambdas"),
+            layers=[self.base_stack.shared_layer],
+            environment={
+                "TABLE_NAME": self.base_stack.table.table_name,
+                "ENVIRONMENT": self.deploy_env,
+                "POWERTOOLS_SERVICE_NAME": "character",
+                "POWERTOOLS_LOG_LEVEL": (
+                    "DEBUG" if self.deploy_env == "dev" else "INFO"
+                ),
+            },
+            timeout=Duration.seconds(30),
+            memory_size=256,
+            tracing=lambda_.Tracing.ACTIVE,
+        )
+
+        # Grant DynamoDB access
+        self.base_stack.table.grant_read_write_data(function)
+
+        return function
 
     def _create_api(self) -> apigw.RestApi:
         """Create API Gateway REST API with CORS configuration."""
@@ -73,55 +106,24 @@ class ChaosApiStack(Stack):
             ),
         )
 
-        # Create placeholder resources for future Lambda integrations
-        # These will be populated by subsequent PRPs
+        # Create Lambda integration for character endpoints
+        character_integration = apigw.LambdaIntegration(
+            self.character_function,
+            proxy=True,
+        )
 
         # /characters endpoint
         characters = api.root.add_resource("characters")
-        characters.add_method(
-            "GET",
-            apigw.MockIntegration(
-                integration_responses=[
-                    apigw.IntegrationResponse(status_code="200")
-                ],
-                request_templates={"application/json": '{"statusCode": 200}'},
-            ),
-            method_responses=[apigw.MethodResponse(status_code="200")],
-        )
-        characters.add_method(
-            "POST",
-            apigw.MockIntegration(
-                integration_responses=[
-                    apigw.IntegrationResponse(status_code="201")
-                ],
-                request_templates={"application/json": '{"statusCode": 201}'},
-            ),
-            method_responses=[apigw.MethodResponse(status_code="201")],
-        )
+        characters.add_method("GET", character_integration)
+        characters.add_method("POST", character_integration)
 
+        # /characters/{characterId} endpoint
         character = characters.add_resource("{characterId}")
-        character.add_method(
-            "GET",
-            apigw.MockIntegration(
-                integration_responses=[
-                    apigw.IntegrationResponse(status_code="200")
-                ],
-                request_templates={"application/json": '{"statusCode": 200}'},
-            ),
-            method_responses=[apigw.MethodResponse(status_code="200")],
-        )
-        character.add_method(
-            "DELETE",
-            apigw.MockIntegration(
-                integration_responses=[
-                    apigw.IntegrationResponse(status_code="204")
-                ],
-                request_templates={"application/json": '{"statusCode": 204}'},
-            ),
-            method_responses=[apigw.MethodResponse(status_code="204")],
-        )
+        character.add_method("GET", character_integration)
+        character.add_method("PATCH", character_integration)
+        character.add_method("DELETE", character_integration)
 
-        # /sessions endpoint
+        # /sessions endpoint (mock for now, will be implemented in future PRP)
         sessions = api.root.add_resource("sessions")
         sessions.add_method(
             "POST",
@@ -190,4 +192,12 @@ class ChaosApiStack(Stack):
             value=self.api.rest_api_id,
             description="API Gateway ID",
             export_name=f"{self.prefix}-api-id",
+        )
+
+        CfnOutput(
+            self,
+            "CharacterFunctionArn",
+            value=self.character_function.function_arn,
+            description="Character Lambda function ARN",
+            export_name=f"{self.prefix}-character-function-arn",
         )

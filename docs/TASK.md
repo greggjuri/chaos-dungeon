@@ -6,7 +6,6 @@
 - None
 
 ### To Do (Phase 1 - Foundation)
-- [ ] init-02-character-api.md - Character CRUD endpoints
 - [ ] init-03-session-api.md - Session management endpoints
 - [ ] init-04-frontend-shell.md - Basic React app with routing
 
@@ -32,6 +31,7 @@
 - [x] Initial project planning (PLANNING.md)
 - [x] Claude Code instructions (CLAUDE.md)
 - [x] init-01-project-foundation.md - CDK base stack, DynamoDB, Lambda structure, Frontend shell
+- [x] init-02-character-api.md - Character CRUD endpoints with BECMI rules
 
 ---
 
@@ -50,4 +50,4 @@ None currently.
 
 ---
 
-*Last updated: 2025-12-31*
+*Last updated: 2026-01-01*
