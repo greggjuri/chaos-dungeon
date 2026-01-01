@@ -4,6 +4,7 @@ Contains:
 - API Gateway REST API with CORS
 - Lambda layer for shared Python code
 - Character Lambda function
+- Session Lambda function
 - Stage configuration for dev/prod
 """
 from aws_cdk import CfnOutput, Duration, Stack
@@ -45,6 +46,7 @@ class ChaosApiStack(Stack):
 
         # Create Lambda functions
         self.character_function = self._create_character_lambda()
+        self.session_function = self._create_session_lambda()
 
         # Create API Gateway
         self.api = self._create_api()
@@ -118,6 +120,50 @@ class ChaosApiStack(Stack):
 
         return function
 
+    def _create_session_lambda(self) -> lambda_.Function:
+        """Create the session handler Lambda function."""
+        function = lambda_.Function(
+            self,
+            "SessionHandler",
+            function_name=f"{self.prefix}-session",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="session.handler.lambda_handler",
+            code=lambda_.Code.from_asset(
+                "../lambdas",
+                exclude=[
+                    "tests",
+                    "tests/*",
+                    "__pycache__",
+                    "**/__pycache__",
+                    ".pytest_cache",
+                    "**/.pytest_cache",
+                    ".venv",
+                    "venv",
+                    "*.pyc",
+                    "**/*.pyc",
+                    ".ruff_cache",
+                    "**/.ruff_cache",
+                ],
+            ),
+            layers=[self.shared_layer],
+            environment={
+                "TABLE_NAME": self.base_stack.table.table_name,
+                "ENVIRONMENT": self.deploy_env,
+                "POWERTOOLS_SERVICE_NAME": "session",
+                "POWERTOOLS_LOG_LEVEL": (
+                    "DEBUG" if self.deploy_env == "dev" else "INFO"
+                ),
+            },
+            timeout=Duration.seconds(30),
+            memory_size=256,
+            tracing=lambda_.Tracing.ACTIVE,
+        )
+
+        # Grant DynamoDB access
+        self.base_stack.table.grant_read_write_data(function)
+
+        return function
+
     def _create_api(self) -> apigw.RestApi:
         """Create API Gateway REST API with CORS configuration."""
         # Determine CORS origins based on environment
@@ -165,32 +211,23 @@ class ChaosApiStack(Stack):
         character.add_method("PATCH", character_integration)
         character.add_method("DELETE", character_integration)
 
-        # /sessions endpoint (mock for now, will be implemented in future PRP)
+        # Create Lambda integration for session endpoints
+        session_integration = apigw.LambdaIntegration(
+            self.session_function,
+            proxy=True,
+        )
+
+        # /sessions endpoint
         sessions = api.root.add_resource("sessions")
-        sessions.add_method(
-            "POST",
-            apigw.MockIntegration(
-                integration_responses=[
-                    apigw.IntegrationResponse(status_code="201")
-                ],
-                request_templates={"application/json": '{"statusCode": 201}'},
-            ),
-            method_responses=[apigw.MethodResponse(status_code="201")],
-        )
+        sessions.add_method("GET", session_integration)
+        sessions.add_method("POST", session_integration)
 
+        # /sessions/{sessionId} endpoint
         session = sessions.add_resource("{sessionId}")
-        session.add_method(
-            "GET",
-            apigw.MockIntegration(
-                integration_responses=[
-                    apigw.IntegrationResponse(status_code="200")
-                ],
-                request_templates={"application/json": '{"statusCode": 200}'},
-            ),
-            method_responses=[apigw.MethodResponse(status_code="200")],
-        )
+        session.add_method("GET", session_integration)
+        session.add_method("DELETE", session_integration)
 
-        # /sessions/{sessionId}/action endpoint
+        # /sessions/{sessionId}/action endpoint (mock for now, will be DM handler)
         action = session.add_resource("action")
         action.add_method(
             "POST",
@@ -205,16 +242,7 @@ class ChaosApiStack(Stack):
 
         # /sessions/{sessionId}/history endpoint
         history = session.add_resource("history")
-        history.add_method(
-            "GET",
-            apigw.MockIntegration(
-                integration_responses=[
-                    apigw.IntegrationResponse(status_code="200")
-                ],
-                request_templates={"application/json": '{"statusCode": 200}'},
-            ),
-            method_responses=[apigw.MethodResponse(status_code="200")],
-        )
+        history.add_method("GET", session_integration)
 
         return api
 
@@ -242,6 +270,14 @@ class ChaosApiStack(Stack):
             value=self.character_function.function_arn,
             description="Character Lambda function ARN",
             export_name=f"{self.prefix}-character-function-arn",
+        )
+
+        CfnOutput(
+            self,
+            "SessionFunctionArn",
+            value=self.session_function.function_arn,
+            description="Session Lambda function ARN",
+            export_name=f"{self.prefix}-session-function-arn",
         )
 
         CfnOutput(

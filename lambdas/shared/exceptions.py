@@ -69,3 +69,15 @@ class ConfigurationError(ChaosDungeonError):
         """
         self.config_key = config_key
         super().__init__(message)
+
+
+class ConflictError(ChaosDungeonError):
+    """Operation conflicts with current state (e.g., resource limits)."""
+
+    def __init__(self, message: str) -> None:
+        """Initialize conflict error.
+
+        Args:
+            message: Error message describing the conflict
+        """
+        super().__init__(message)

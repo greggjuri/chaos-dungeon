@@ -6,7 +6,6 @@
 - None
 
 ### To Do (Phase 1 - Foundation)
-- [ ] init-03-session-api.md - Session management endpoints
 - [ ] init-04-frontend-shell.md - Basic React app with routing
 
 ### To Do (Phase 2 - Core Game Loop)
@@ -32,6 +31,7 @@
 - [x] Claude Code instructions (CLAUDE.md)
 - [x] init-01-project-foundation.md - CDK base stack, DynamoDB, Lambda structure, Frontend shell
 - [x] init-02-character-api.md - Character CRUD endpoints with BECMI rules
+- [x] init-03-session-api.md - Session CRUD with campaign settings and message history
 
 ---
 
