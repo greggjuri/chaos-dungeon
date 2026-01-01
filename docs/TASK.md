@@ -9,7 +9,6 @@
 - (completed)
 
 ### To Do (Phase 2 - Core Game Loop)
-- [ ] init-05-dm-system-prompt.md - DM prompt engineering
 - [ ] init-06-action-handler.md - Process player actions
 - [ ] init-07-game-ui.md - Chat interface with message history
 - [ ] init-08-state-parsing.md - Parse DM responses for state changes
@@ -33,6 +32,7 @@
 - [x] init-02-character-api.md - Character CRUD endpoints with BECMI rules
 - [x] init-03-session-api.md - Session CRUD with campaign settings and message history
 - [x] init-04-frontend-shell.md - React app with routing, pages, API services, user context, age gate
+- [x] init-05-dm-system-prompt.md - DM prompt engineering with BECMI rules, campaign prompts, response parser
 
 ---
 
@@ -51,4 +51,4 @@ None currently.
 
 ---
 
-*Last updated: 2026-01-01*
+*Last updated: 2026-01-01 (init-05 complete)*

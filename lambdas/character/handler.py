@@ -2,7 +2,7 @@
 from typing import Any
 
 from aws_lambda_powertools import Logger, Tracer
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver, Response, CORSConfig
+from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig, Response
 from aws_lambda_powertools.event_handler.exceptions import (
     BadRequestError,
     UnauthorizedError,
