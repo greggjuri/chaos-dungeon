@@ -17,7 +17,12 @@ export function useLocalStorage<T>(
   const [storedValue, setStoredValue] = useState<T>(() => {
     try {
       const item = window.localStorage.getItem(key);
-      return item ? (JSON.parse(item) as T) : initialValue;
+      if (item) {
+        return JSON.parse(item) as T;
+      }
+      // Persist initial value to localStorage when key doesn't exist
+      window.localStorage.setItem(key, JSON.stringify(initialValue));
+      return initialValue;
     } catch {
       return initialValue;
     }

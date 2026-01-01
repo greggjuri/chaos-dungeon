@@ -2,7 +2,7 @@
 from typing import Any
 
 from aws_lambda_powertools import Logger, Tracer
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver, Response
+from aws_lambda_powertools.event_handler import APIGatewayRestResolver, Response, CORSConfig
 from aws_lambda_powertools.event_handler.exceptions import (
     BadRequestError,
     UnauthorizedError,
@@ -22,7 +22,12 @@ from shared.utils import extract_user_id
 
 logger = Logger()
 tracer = Tracer()
-app = APIGatewayRestResolver()
+cors_config = CORSConfig(
+    allow_origin="*",
+    allow_headers=["Content-Type", "X-User-Id"],
+    max_age=300
+)
+app = APIGatewayRestResolver(cors=cors_config)
 
 # Initialize service lazily
 _service: CharacterService | None = None
