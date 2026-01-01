@@ -3,11 +3,9 @@
 Contains:
 - DynamoDB table with single-table design
 - Secrets Manager secret for Claude API key
-- Lambda layer for shared Python code
 """
 from aws_cdk import CfnOutput, RemovalPolicy, Stack
 from aws_cdk import aws_dynamodb as dynamodb
-from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
@@ -38,7 +36,6 @@ class ChaosBaseStack(Stack):
         # Create resources
         self.table = self._create_table()
         self.claude_secret = self._create_secret()
-        self.shared_layer = self._create_lambda_layer()
 
         # Export outputs
         self._create_outputs()
@@ -91,28 +88,6 @@ class ChaosBaseStack(Stack):
             description="Claude API key for Chaos Dungeon DM",
         )
 
-    def _create_lambda_layer(self) -> lambda_.LayerVersion:
-        """Create Lambda layer for shared Python code."""
-        return lambda_.LayerVersion(
-            self,
-            "SharedLayer",
-            layer_version_name=f"{self.prefix}-shared",
-            code=lambda_.Code.from_asset(
-                "../lambdas",
-                bundling={
-                    "image": lambda_.Runtime.PYTHON_3_12.bundling_image,
-                    "command": [
-                        "bash",
-                        "-c",
-                        "pip install -r requirements.txt -t /asset-output/python "
-                        "&& cp -r shared /asset-output/python/",
-                    ],
-                },
-            ),
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
-            description="Shared utilities and models for Chaos Dungeon",
-        )
-
     def _create_outputs(self) -> None:
         """Create CloudFormation outputs."""
         CfnOutput(
@@ -139,10 +114,3 @@ class ChaosBaseStack(Stack):
             export_name=f"{self.prefix}-claude-secret-arn",
         )
 
-        CfnOutput(
-            self,
-            "SharedLayerArn",
-            value=self.shared_layer.layer_version_arn,
-            description="Shared Lambda layer ARN",
-            export_name=f"{self.prefix}-shared-layer-arn",
-        )

@@ -2,6 +2,7 @@
 
 Contains:
 - API Gateway REST API with CORS
+- Lambda layer for shared Python code
 - Character Lambda function
 - Stage configuration for dev/prod
 """
@@ -39,6 +40,9 @@ class ChaosApiStack(Stack):
         self.prefix = f"chaos-{environment}"
         self.base_stack = base_stack
 
+        # Create Lambda layer first
+        self.shared_layer = self._create_lambda_layer()
+
         # Create Lambda functions
         self.character_function = self._create_character_lambda()
 
@@ -47,6 +51,28 @@ class ChaosApiStack(Stack):
 
         # Export outputs
         self._create_outputs()
+
+    def _create_lambda_layer(self) -> lambda_.LayerVersion:
+        """Create Lambda layer for shared Python code and dependencies."""
+        return lambda_.LayerVersion(
+            self,
+            "SharedLayer",
+            layer_version_name=f"{self.prefix}-shared",
+            code=lambda_.Code.from_asset(
+                "../lambdas",
+                bundling={
+                    "image": lambda_.Runtime.PYTHON_3_12.bundling_image,
+                    "command": [
+                        "bash",
+                        "-c",
+                        "pip install -r requirements.txt -t /asset-output/python "
+                        "&& cp -r shared /asset-output/python/",
+                    ],
+                },
+            ),
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            description="Shared utilities and models for Chaos Dungeon",
+        )
 
     def _create_character_lambda(self) -> lambda_.Function:
         """Create the character handler Lambda function."""
@@ -73,7 +99,7 @@ class ChaosApiStack(Stack):
                     "**/.ruff_cache",
                 ],
             ),
-            layers=[self.base_stack.shared_layer],
+            layers=[self.shared_layer],
             environment={
                 "TABLE_NAME": self.base_stack.table.table_name,
                 "ENVIRONMENT": self.deploy_env,
@@ -216,4 +242,12 @@ class ChaosApiStack(Stack):
             value=self.character_function.function_arn,
             description="Character Lambda function ARN",
             export_name=f"{self.prefix}-character-function-arn",
+        )
+
+        CfnOutput(
+            self,
+            "SharedLayerArn",
+            value=self.shared_layer.layer_version_arn,
+            description="Shared Lambda layer ARN",
+            export_name=f"{self.prefix}-api-shared-layer-arn",
         )
