@@ -6,7 +6,7 @@
 - None
 
 ### To Do (Phase 1 - Foundation)
-- [ ] init-04-frontend-shell.md - Basic React app with routing
+- (completed)
 
 ### To Do (Phase 2 - Core Game Loop)
 - [ ] init-05-dm-system-prompt.md - DM prompt engineering
@@ -32,6 +32,7 @@
 - [x] init-01-project-foundation.md - CDK base stack, DynamoDB, Lambda structure, Frontend shell
 - [x] init-02-character-api.md - Character CRUD endpoints with BECMI rules
 - [x] init-03-session-api.md - Session CRUD with campaign settings and message history
+- [x] init-04-frontend-shell.md - React app with routing, pages, API services, user context, age gate
 
 ---
 

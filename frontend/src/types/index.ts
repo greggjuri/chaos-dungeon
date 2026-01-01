@@ -97,3 +97,86 @@ export interface ActionResponse {
   dice_rolls?: DiceRoll[];
   state_changes?: Record<string, unknown>;
 }
+
+// ============ API Response Types ============
+
+/** Campaign setting options */
+export type CampaignSetting =
+  | 'default'
+  | 'dark_forest'
+  | 'cursed_castle'
+  | 'forgotten_mines';
+
+/** Character summary for list view */
+export interface CharacterSummary {
+  character_id: string;
+  name: string;
+  character_class: CharacterClass;
+  level: number;
+  created_at: string;
+}
+
+/** Response from GET /characters */
+export interface CharacterListResponse {
+  characters: CharacterSummary[];
+}
+
+/** Session summary for list view */
+export interface SessionSummary {
+  session_id: string;
+  character_id: string;
+  character_name: string;
+  campaign_setting: CampaignSetting;
+  current_location: string;
+  created_at: string;
+  updated_at: string | null;
+}
+
+/** Response from GET /sessions */
+export interface SessionListResponse {
+  sessions: SessionSummary[];
+}
+
+/** Request to create a session */
+export interface SessionCreateRequest {
+  character_id: string;
+  campaign_setting?: CampaignSetting;
+}
+
+/** Response from POST /sessions */
+export interface SessionCreateResponse {
+  session_id: string;
+  character_id: string;
+  campaign_setting: CampaignSetting;
+  current_location: string;
+  world_state: Record<string, unknown>;
+  message_history: Message[];
+  created_at: string;
+}
+
+/** Response from GET /sessions/{id}/history */
+export interface MessageHistoryResponse {
+  messages: Message[];
+  has_more: boolean;
+  next_cursor: string | null;
+}
+
+// ============ Error Types ============
+
+/** API error response body */
+export interface ApiErrorBody {
+  error: string;
+  details?: Record<string, unknown>;
+}
+
+/** Custom error for API requests */
+export class ApiRequestError extends Error {
+  constructor(
+    public status: number,
+    public error: string,
+    public details?: Record<string, unknown>
+  ) {
+    super(error);
+    this.name = 'ApiRequestError';
+  }
+}
