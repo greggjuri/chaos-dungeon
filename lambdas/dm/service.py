@@ -8,7 +8,7 @@ from dm.claude_client import ClaudeClient
 from dm.models import ActionResponse, CharacterSnapshot, DMResponse
 from dm.parser import parse_dm_response
 from dm.prompts import DMPromptBuilder
-from shared.db import DynamoDBClient
+from shared.db import DynamoDBClient, convert_floats_to_decimal
 from shared.exceptions import GameStateError, NotFoundError
 from shared.models import AbilityScores, Character, Item, Message, Session
 from shared.secrets import get_claude_api_key
@@ -107,7 +107,7 @@ class DMService:
             hp=character["hp"],
             max_hp=character["max_hp"],
             gold=character["gold"],
-            abilities=AbilityScores(**character["abilities"]),
+            abilities=AbilityScores(**character["stats"]),
             inventory=[
                 Item(**item) if isinstance(item, dict) else Item(name=item)
                 for item in character.get("inventory", [])
@@ -162,16 +162,16 @@ class DMService:
         character["updated_at"] = now
         session["updated_at"] = now
 
-        self.db.put_item(
-            char_pk,
-            char_sk,
-            {k: v for k, v in character.items() if k not in ("PK", "SK")},
+        # Convert floats to Decimal for DynamoDB compatibility
+        char_data = convert_floats_to_decimal(
+            {k: v for k, v in character.items() if k not in ("PK", "SK")}
         )
-        self.db.put_item(
-            session_pk,
-            session_sk,
-            {k: v for k, v in session.items() if k not in ("PK", "SK")},
+        session_data = convert_floats_to_decimal(
+            {k: v for k, v in session.items() if k not in ("PK", "SK")}
         )
+
+        self.db.put_item(char_pk, char_sk, char_data)
+        self.db.put_item(session_pk, session_sk, session_data)
 
         # Build response
         inventory_names = [

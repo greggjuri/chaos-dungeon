@@ -1,5 +1,6 @@
 """DynamoDB client wrapper for single-table design."""
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 import boto3
@@ -9,6 +10,27 @@ from botocore.exceptions import ClientError
 from .exceptions import NotFoundError
 
 logger = Logger(child=True)
+
+
+def convert_floats_to_decimal(obj: Any) -> Any:
+    """Recursively convert floats to Decimal for DynamoDB compatibility.
+
+    DynamoDB does not support Python float types. This function converts
+    all floats in nested dicts/lists to Decimal.
+
+    Args:
+        obj: Any Python object (dict, list, or primitive)
+
+    Returns:
+        The object with all floats converted to Decimal
+    """
+    if isinstance(obj, float):
+        return Decimal(str(obj))
+    elif isinstance(obj, dict):
+        return {k: convert_floats_to_decimal(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_floats_to_decimal(item) for item in obj]
+    return obj
 
 
 class DynamoDBClient:

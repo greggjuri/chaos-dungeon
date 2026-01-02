@@ -87,7 +87,7 @@ def sample_character():
         "hp": 8,
         "max_hp": 8,
         "gold": 100,
-        "abilities": {
+        "stats": {
             "strength": 16,
             "intelligence": 10,
             "wisdom": 12,

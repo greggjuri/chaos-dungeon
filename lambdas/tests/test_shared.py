@@ -3,7 +3,7 @@ import pytest
 from moto import mock_aws
 
 from shared.config import Config, get_config
-from shared.db import DynamoDBClient
+from shared.db import DynamoDBClient, convert_floats_to_decimal
 from shared.exceptions import (
     ChaosDungeonError,
     ConfigurationError,
@@ -306,6 +306,49 @@ class TestUtils:
         assert calculate_modifier(14) == 1
         assert calculate_modifier(17) == 2
         assert calculate_modifier(18) == 3
+
+
+class TestConvertFloatsToDecimal:
+    """Tests for convert_floats_to_decimal utility."""
+
+    def test_converts_float_to_decimal(self):
+        """Float values should be converted to Decimal."""
+        from decimal import Decimal
+
+        result = convert_floats_to_decimal(3.14)
+        assert isinstance(result, Decimal)
+        assert result == Decimal("3.14")
+
+    def test_converts_nested_dict(self):
+        """Floats in nested dicts should be converted."""
+        from decimal import Decimal
+
+        data = {"weight": 2.5, "nested": {"value": 1.5}}
+        result = convert_floats_to_decimal(data)
+
+        assert result["weight"] == Decimal("2.5")
+        assert result["nested"]["value"] == Decimal("1.5")
+
+    def test_converts_list_items(self):
+        """Floats in lists should be converted."""
+        from decimal import Decimal
+
+        data = [1.1, 2.2, {"weight": 3.3}]
+        result = convert_floats_to_decimal(data)
+
+        assert result[0] == Decimal("1.1")
+        assert result[1] == Decimal("2.2")
+        assert result[2]["weight"] == Decimal("3.3")
+
+    def test_preserves_non_floats(self):
+        """Non-float values should be preserved."""
+        data = {"name": "Sword", "quantity": 1, "active": True, "tags": None}
+        result = convert_floats_to_decimal(data)
+
+        assert result["name"] == "Sword"
+        assert result["quantity"] == 1
+        assert result["active"] is True
+        assert result["tags"] is None
 
 
 class TestDynamoDBClient:
