@@ -9,7 +9,7 @@
 - (completed)
 
 ### To Do (Phase 2 - Core Game Loop)
-- [ ] init-06-action-handler.md - Process player actions
+- [x] init-06-action-handler.md - Process player actions
 - [ ] init-07-game-ui.md - Chat interface with message history
 - [ ] init-08-state-parsing.md - Parse DM responses for state changes
 
@@ -33,6 +33,7 @@
 - [x] init-03-session-api.md - Session CRUD with campaign settings and message history
 - [x] init-04-frontend-shell.md - React app with routing, pages, API services, user context, age gate
 - [x] init-05-dm-system-prompt.md - DM prompt engineering with BECMI rules, campaign prompts, response parser
+- [x] init-06-action-handler.md - DM Lambda with Claude API, action processing, state changes
 
 ---
 
@@ -51,4 +52,4 @@ None currently.
 
 ---
 
-*Last updated: 2026-01-01 (init-05 complete)*
+*Last updated: 2026-01-02 (init-06 complete)*

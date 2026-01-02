@@ -1,8 +1,8 @@
-"""Pydantic models for DM response parsing."""
+"""Pydantic models for DM response parsing and action handling."""
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class StateChanges(BaseModel):
@@ -96,3 +96,66 @@ class DMResponse(BaseModel):
 
     enemies: list[Enemy] = Field(default_factory=list)
     """Current enemy status (only during combat)."""
+
+
+class ActionRequest(BaseModel):
+    """Player action request."""
+
+    action: str = Field(..., min_length=1, max_length=500)
+    """The player's action text (1-500 chars)."""
+
+    @field_validator("action")
+    @classmethod
+    def validate_action(cls, v: str) -> str:
+        """Strip whitespace from action."""
+        return v.strip()
+
+
+class CharacterSnapshot(BaseModel):
+    """Character state to include in response."""
+
+    hp: int
+    """Current hit points."""
+
+    max_hp: int
+    """Maximum hit points."""
+
+    xp: int
+    """Current experience points."""
+
+    gold: int
+    """Current gold."""
+
+    level: int
+    """Character level."""
+
+    inventory: list[str]
+    """List of item names in inventory."""
+
+
+class ActionResponse(BaseModel):
+    """Full response to player action."""
+
+    narrative: str
+    """The DM's narrative response."""
+
+    state_changes: StateChanges
+    """State changes applied this turn."""
+
+    dice_rolls: list[DiceRoll]
+    """Dice rolls made during this turn."""
+
+    combat_active: bool
+    """Whether combat is ongoing."""
+
+    enemies: list[Enemy]
+    """Current enemy status (if in combat)."""
+
+    character: CharacterSnapshot
+    """Updated character state."""
+
+    character_dead: bool = False
+    """True if character died this turn."""
+
+    session_ended: bool = False
+    """True if session has ended."""

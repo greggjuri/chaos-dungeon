@@ -5,10 +5,12 @@ Contains:
 - Lambda layer for shared Python code
 - Character Lambda function
 - Session Lambda function
+- DM Lambda function (action handler)
 - Stage configuration for dev/prod
 """
 from aws_cdk import CfnOutput, Duration, Stack
 from aws_cdk import aws_apigateway as apigw
+from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as lambda_
 from constructs import Construct
 
@@ -47,6 +49,7 @@ class ChaosApiStack(Stack):
         # Create Lambda functions
         self.character_function = self._create_character_lambda()
         self.session_function = self._create_session_lambda()
+        self.dm_function = self._create_dm_lambda()
 
         # Create API Gateway
         self.api = self._create_api()
@@ -164,6 +167,62 @@ class ChaosApiStack(Stack):
 
         return function
 
+    def _create_dm_lambda(self) -> lambda_.Function:
+        """Create the DM handler Lambda function for action processing."""
+        function = lambda_.Function(
+            self,
+            "DMHandler",
+            function_name=f"{self.prefix}-dm",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="dm.handler.lambda_handler",
+            code=lambda_.Code.from_asset(
+                "../lambdas",
+                exclude=[
+                    "tests",
+                    "tests/*",
+                    "__pycache__",
+                    "**/__pycache__",
+                    ".pytest_cache",
+                    "**/.pytest_cache",
+                    ".venv",
+                    "venv",
+                    "*.pyc",
+                    "**/*.pyc",
+                    ".ruff_cache",
+                    "**/.ruff_cache",
+                ],
+            ),
+            layers=[self.shared_layer],
+            environment={
+                "TABLE_NAME": self.base_stack.table.table_name,
+                "ENVIRONMENT": self.deploy_env,
+                "POWERTOOLS_SERVICE_NAME": "dm",
+                "POWERTOOLS_LOG_LEVEL": (
+                    "DEBUG" if self.deploy_env == "dev" else "INFO"
+                ),
+                "CLAUDE_API_KEY_PARAM": "/automations/dev/secrets/anthropic_api_key",
+            },
+            timeout=Duration.seconds(30),  # Claude API can be slow
+            memory_size=256,
+            tracing=lambda_.Tracing.ACTIVE,
+        )
+
+        # Grant DynamoDB access
+        self.base_stack.table.grant_read_write_data(function)
+
+        # Grant SSM Parameter Store access for Claude API key
+        function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["ssm:GetParameter"],
+                resources=[
+                    "arn:aws:ssm:us-east-1:490004610151:parameter/automations/dev/secrets/anthropic_api_key"
+                ],
+            )
+        )
+
+        return function
+
     def _create_api(self) -> apigw.RestApi:
         """Create API Gateway REST API with CORS configuration."""
         # Determine CORS origins based on environment
@@ -227,18 +286,15 @@ class ChaosApiStack(Stack):
         session.add_method("GET", session_integration)
         session.add_method("DELETE", session_integration)
 
-        # /sessions/{sessionId}/action endpoint (mock for now, will be DM handler)
-        action = session.add_resource("action")
-        action.add_method(
-            "POST",
-            apigw.MockIntegration(
-                integration_responses=[
-                    apigw.IntegrationResponse(status_code="200")
-                ],
-                request_templates={"application/json": '{"statusCode": 200}'},
-            ),
-            method_responses=[apigw.MethodResponse(status_code="200")],
+        # Create Lambda integration for DM handler
+        dm_integration = apigw.LambdaIntegration(
+            self.dm_function,
+            proxy=True,
         )
+
+        # /sessions/{sessionId}/action endpoint
+        action = session.add_resource("action")
+        action.add_method("POST", dm_integration)
 
         # /sessions/{sessionId}/history endpoint
         history = session.add_resource("history")
@@ -286,4 +342,12 @@ class ChaosApiStack(Stack):
             value=self.shared_layer.layer_version_arn,
             description="Shared Lambda layer ARN",
             export_name=f"{self.prefix}-api-shared-layer-arn",
+        )
+
+        CfnOutput(
+            self,
+            "DMFunctionArn",
+            value=self.dm_function.function_arn,
+            description="DM Lambda function ARN",
+            export_name=f"{self.prefix}-dm-function-arn",
         )
