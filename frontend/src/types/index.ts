@@ -64,12 +64,13 @@ export interface Session {
   updated_at?: string;
 }
 
-/** Dice roll result */
+/** Dice roll result from server */
 export interface DiceRoll {
-  type: string; // e.g., "d20", "2d6"
-  result: number;
-  modifier?: number;
-  success?: boolean;
+  type: string;
+  roll: number;
+  modifier: number;
+  total: number;
+  success: boolean | null;
 }
 
 /** API response wrapper */
@@ -159,6 +160,56 @@ export interface MessageHistoryResponse {
   messages: Message[];
   has_more: boolean;
   next_cursor: string | null;
+}
+
+// ============ Game UI Types ============
+
+/** State changes from action response */
+export interface StateChanges {
+  hp_delta: number;
+  gold_delta: number;
+  xp_delta: number;
+  location: string | null;
+  inventory_add: string[];
+  inventory_remove: string[];
+  world_state: Record<string, unknown>;
+}
+
+/** Enemy in combat */
+export interface CombatEnemy {
+  id?: string;
+  name: string;
+  hp: number;
+  max_hp: number;
+  ac: number;
+}
+
+/** Character snapshot from action response */
+export interface CharacterSnapshot {
+  hp: number;
+  max_hp: number;
+  xp: number;
+  gold: number;
+  level: number;
+  inventory: string[];
+}
+
+/** Full action response from server */
+export interface FullActionResponse {
+  narrative: string;
+  state_changes: StateChanges;
+  dice_rolls: DiceRoll[];
+  combat_active: boolean;
+  enemies: CombatEnemy[];
+  character: CharacterSnapshot;
+  character_dead: boolean;
+  session_ended: boolean;
+}
+
+/** Extended message for game UI (includes dice rolls and state changes) */
+export interface GameMessage extends Message {
+  dice_rolls?: DiceRoll[];
+  state_changes?: StateChanges;
 }
 
 // ============ Error Types ============

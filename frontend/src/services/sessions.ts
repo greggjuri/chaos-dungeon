@@ -8,6 +8,7 @@ import {
   SessionCreateRequest,
   SessionCreateResponse,
   MessageHistoryResponse,
+  FullActionResponse,
 } from '../types';
 
 export const sessionService = {
@@ -47,4 +48,13 @@ export const sessionService = {
    */
   delete: (id: string) =>
     request<void>(`/sessions/${id}`, { method: 'DELETE' }),
+
+  /**
+   * Send a player action to the DM.
+   */
+  sendAction: (sessionId: string, action: string) =>
+    request<FullActionResponse>(`/sessions/${sessionId}/action`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    }),
 };

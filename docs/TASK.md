@@ -10,7 +10,7 @@
 
 ### To Do (Phase 2 - Core Game Loop)
 - [x] init-06-action-handler.md - Process player actions
-- [ ] init-07-game-ui.md - Chat interface with message history
+- [x] init-08-game-ui.md - Chat interface with message history
 - [ ] init-08-state-parsing.md - Parse DM responses for state changes
 
 ### To Do (Phase 3 - Game Systems)
@@ -35,6 +35,7 @@
 - [x] init-05-dm-system-prompt.md - DM prompt engineering with BECMI rules, campaign prompts, response parser
 - [x] init-06-action-handler.md - DM Lambda with Claude API, action processing, state changes
 - [x] init-07-combat-system.md - Server-side combat resolution with dice, bestiary, combat resolver
+- [x] init-08-game-ui.md - Chat interface with message history, character status, combat display
 
 ---
 
@@ -53,4 +54,4 @@ None currently.
 
 ---
 
-*Last updated: 2026-01-02 (init-07 combat system complete)*
+*Last updated: 2026-01-03 (init-08 game UI complete)*
