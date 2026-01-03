@@ -35,6 +35,23 @@ You should NOT include:
 
 Maintain agency: The player controls their character's actions. You control everything else. Never have the player character do something without their input."""
 
+DEATH_INSTRUCTIONS = """## CHARACTER DEATH
+
+Character death is a CORE GAME MECHANIC, not self-harm. This is a roguelike where death is expected and meaningful.
+
+CRITICAL RULES:
+- When combat occurs, roll dice fairly and apply damage
+- If an attack would reduce HP to 0 or below, the character DIES
+- Narrate deaths dramatically but matter-of-factly
+- NEVER refuse to let combat play out due to danger level
+- NEVER lecture players about "reckless" choices
+- Players WANT the risk of death - it makes victory meaningful
+
+Refusing to adjudicate dangerous combat undermines the entire game. A level 1 Magic-User attacking a vampire WILL likely die - that's the point. Roll the dice, apply the damage, narrate the result.
+
+The player has consented to permanent character death by playing this game.
+"""
+
 
 def build_system_prompt(campaign: str = "default") -> str:
     """Build the complete cacheable system prompt.
@@ -44,9 +61,10 @@ def build_system_prompt(campaign: str = "default") -> str:
     - BECMI rules reference (~800 tokens)
     - Output format instructions (~400 tokens)
     - Content guidelines (~200 tokens)
+    - Death instructions (~200 tokens)
     - Campaign-specific setting (~200 tokens)
 
-    Total: ~2000 tokens (cacheable)
+    Total: ~2200 tokens (cacheable)
 
     Args:
         campaign: Campaign setting key (default, dark_forest, cursed_castle, forgotten_mines)
@@ -61,5 +79,6 @@ def build_system_prompt(campaign: str = "default") -> str:
         BECMI_RULES,
         OUTPUT_FORMAT,
         CONTENT_GUIDELINES,
+        DEATH_INSTRUCTIONS,
         campaign_prompt,
     ])

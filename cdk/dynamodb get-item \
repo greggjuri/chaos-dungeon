@@ -1,0 +1,41 @@
+{
+    "events": [
+        {
+            "logStreamName": "2026/01/02/[$LATEST]242dec939bc146b6b2de70efbda657ae",
+            "timestamp": 1767397668462,
+            "message": "{\"level\":\"INFO\",\"location\":\"send_action:71\",\"message\":\"Claude API usage\",\"timestamp\":\"2026-01-02 23:47:48,461+0000\",\"service\":\"dm\",\"cold_start\":true,\"function_name\":\"chaos-dev-dm\",\"function_memory_size\":\"256\",\"function_arn\":\"arn:aws:lambda:us-east-1:490004610151:function:chaos-dev-dm\",\"function_request_id\":\"98cbdd65-62cf-4c2d-af3b-4ca158a5cfaf\",\"input_tokens\":1837,\"output_tokens\":267,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"estimated_cost_usd\":0.000793,\"xray_trace_id\":\"1-6958591c-727c40824721a12829c059f8\"}\n",
+            "ingestionTime": 1767397677479,
+            "eventId": "39414285068848164650794862991005085044896736688790700032"
+        },
+        {
+            "logStreamName": "2026/01/02/[$LATEST]242dec939bc146b6b2de70efbda657ae",
+            "timestamp": 1767397730097,
+            "message": "{\"level\":\"INFO\",\"location\":\"send_action:71\",\"message\":\"Claude API usage\",\"timestamp\":\"2026-01-02 23:48:50,097+0000\",\"service\":\"dm\",\"cold_start\":false,\"function_name\":\"chaos-dev-dm\",\"function_memory_size\":\"256\",\"function_arn\":\"arn:aws:lambda:us-east-1:490004610151:function:chaos-dev-dm\",\"function_request_id\":\"2ae657db-3c56-4802-98a3-169d29ea5c5c\",\"input_tokens\":2083,\"output_tokens\":361,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"estimated_cost_usd\":0.000972,\"xray_trace_id\":\"1-6958595f-2883c9c85a477abb00924801\"}\n",
+            "ingestionTime": 1767397736403,
+            "eventId": "39414286443354594962229820390793774941488015274848550916"
+        },
+        {
+            "logStreamName": "2026/01/02/[$LATEST]242dec939bc146b6b2de70efbda657ae",
+            "timestamp": 1767397784610,
+            "message": "{\"level\":\"INFO\",\"location\":\"send_action:71\",\"message\":\"Claude API usage\",\"timestamp\":\"2026-01-02 23:49:44,609+0000\",\"service\":\"dm\",\"cold_start\":false,\"function_name\":\"chaos-dev-dm\",\"function_memory_size\":\"256\",\"function_arn\":\"arn:aws:lambda:us-east-1:490004610151:function:chaos-dev-dm\",\"function_request_id\":\"b55ad986-63f7-460b-b9a9-927b0d96bc12\",\"input_tokens\":2320,\"output_tokens\":440,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"estimated_cost_usd\":0.00113,\"xray_trace_id\":\"1-69585995-7df2aad3322791c57f009192\"}\n",
+            "ingestionTime": 1767397790075,
+            "eventId": "39414287659035117969729679770215655910515369388646727684"
+        },
+        {
+            "logStreamName": "2026/01/02/[$LATEST]c33e902284e84dfd98a14736d6d50301",
+            "timestamp": 1767398238078,
+            "message": "{\"level\":\"INFO\",\"location\":\"send_action:71\",\"message\":\"Claude API usage\",\"timestamp\":\"2026-01-02 23:57:18,078+0000\",\"service\":\"dm\",\"cold_start\":true,\"function_name\":\"chaos-dev-dm\",\"function_memory_size\":\"256\",\"function_arn\":\"arn:aws:lambda:us-east-1:490004610151:function:chaos-dev-dm\",\"function_request_id\":\"2dc1dd21-beca-421d-94af-da6e91e32516\",\"input_tokens\":2320,\"output_tokens\":413,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"estimated_cost_usd\":0.001096,\"xray_trace_id\":\"1-69585b55-0823178d1b7521aa4c9256ee\"}\n",
+            "ingestionTime": 1767398247097,
+            "eventId": "39414297771709441657014295068640605895797661133080690688"
+        },
+        {
+            "logStreamName": "2026/01/02/[$LATEST]c33e902284e84dfd98a14736d6d50301",
+            "timestamp": 1767398667978,
+            "message": "{\"level\":\"INFO\",\"location\":\"send_action:71\",\"message\":\"Claude API usage\",\"timestamp\":\"2026-01-03 00:04:27,977+0000\",\"service\":\"dm\",\"cold_start\":false,\"function_name\":\"chaos-dev-dm\",\"function_memory_size\":\"256\",\"function_arn\":\"arn:aws:lambda:us-east-1:490004610151:function:chaos-dev-dm\",\"function_request_id\":\"f8993264-80e7-4a75-80dc-54de74472c8d\",\"input_tokens\":2549,\"output_tokens\":370,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"estimated_cost_usd\":0.0011,\"xray_trace_id\":\"1-69585d09-31f0686b25ee9a3f36870641\"}\n",
+            "ingestionTime": 1767398674181,
+            "eventId": "39414307358799802505329184131158564904291324400012754948"
+        }
+    ],
+    "searchedLogStreams": [],
+    "nextToken": "Bxkq6kVGFtq2y_MoigeqscPOdhXVbhiVtLoAmXb5jCqe9gKTr3XB_TBkQMIU3VSic4Fg0gB2elJJ6qSkElFMaSs-dw26n2iQfbvGqFFuqwnq_zmFTAezxjy8xoxnC3xRf0KuJJjnw5ge4m3DMca4aIU_tTPEXe7iW-xMRJ1b28t96Q81GzWNSOZsbh6Z4R19yMc1b8nt3bTJrtv_Xe09iMVAzAg3FtbxaGpy4xxSgDOu-4_PdnpnJLvogNO8uJIY_WXpTzjw9bp60SCoTMd878SrGIcTGSE-3E_OMJLTDYsvqNuT-w2BUrChWryWDsdk8aKhnWkEGxOmPBjSu4_hfA"
+}
