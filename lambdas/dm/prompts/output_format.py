@@ -1,6 +1,6 @@
 """Output format instructions for the DM system prompt."""
 
-OUTPUT_FORMAT = '''## OUTPUT FORMAT
+OUTPUT_FORMAT = """## OUTPUT FORMAT
 
 Every response MUST include TWO parts:
 
@@ -52,4 +52,4 @@ Rules for state changes:
 If no state changes occurred, use:
 ```json
 {"state_changes": {}}
-```'''
+```"""

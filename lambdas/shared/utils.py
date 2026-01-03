@@ -1,4 +1,5 @@
 """Utility functions for Chaos Dungeon Lambda handlers."""
+
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4

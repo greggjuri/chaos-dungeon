@@ -2,6 +2,7 @@
 
 Implements character creation rules from the 1983 D&D Basic/Expert/Companion/Master set.
 """
+
 from enum import Enum
 
 

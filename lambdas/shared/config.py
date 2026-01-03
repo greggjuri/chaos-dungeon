@@ -1,4 +1,5 @@
 """Environment configuration for Lambda functions."""
+
 import os
 from dataclasses import dataclass
 

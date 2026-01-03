@@ -1,6 +1,5 @@
 """Tests for DM response parser."""
 
-
 from dm.models import DiceRoll, DMResponse, Enemy, StateChanges
 from dm.parser import parse_dm_response
 
@@ -10,7 +9,7 @@ class TestParseDMResponse:
 
     def test_parse_valid_response(self) -> None:
         """Test parsing a complete valid response."""
-        response = '''The goblin snarls as you swing your sword. Your blade connects with a satisfying thunk, and the creature falls.
+        response = """The goblin snarls as you swing your sword. Your blade connects with a satisfying thunk, and the creature falls.
 
 ```json
 {
@@ -25,7 +24,7 @@ class TestParseDMResponse:
   ],
   "combat_active": false
 }
-```'''
+```"""
 
         result = parse_dm_response(response)
 
@@ -40,7 +39,7 @@ class TestParseDMResponse:
 
     def test_parse_state_changes_all_fields(self) -> None:
         """Test parsing all state change fields."""
-        response = '''You pick up the key and move forward.
+        response = """You pick up the key and move forward.
 
 ```json
 {
@@ -57,7 +56,7 @@ class TestParseDMResponse:
     }
   }
 }
-```'''
+```"""
 
         result = parse_dm_response(response)
 
@@ -73,7 +72,7 @@ class TestParseDMResponse:
 
     def test_parse_dice_rolls(self) -> None:
         """Test parsing dice rolls."""
-        response = '''The thief attempts to pick the lock.
+        response = """The thief attempts to pick the lock.
 
 ```json
 {
@@ -83,7 +82,7 @@ class TestParseDMResponse:
     {"type": "save", "roll": 18, "modifier": -1, "total": 17, "success": true}
   ]
 }
-```'''
+```"""
 
         result = parse_dm_response(response)
 
@@ -102,7 +101,7 @@ class TestParseDMResponse:
 
     def test_parse_combat_state(self) -> None:
         """Test parsing combat state with enemies."""
-        response = '''Two goblins emerge from the shadows!
+        response = """Two goblins emerge from the shadows!
 
 ```json
 {
@@ -113,7 +112,7 @@ class TestParseDMResponse:
     {"name": "Goblin Archer", "hp": 4, "ac": 11}
   ]
 }
-```'''
+```"""
 
         result = parse_dm_response(response)
 
@@ -133,7 +132,9 @@ class TestParseDMResponse:
 
     def test_parse_no_json(self) -> None:
         """Test parsing response without JSON block."""
-        response = "The door creaks open, revealing a dusty chamber beyond. Cobwebs hang from the ceiling."
+        response = (
+            "The door creaks open, revealing a dusty chamber beyond. Cobwebs hang from the ceiling."
+        )
 
         result = parse_dm_response(response)
 
@@ -148,11 +149,11 @@ class TestParseDMResponse:
 
     def test_parse_invalid_json(self) -> None:
         """Test parsing response with malformed JSON."""
-        response = '''You enter the room.
+        response = """You enter the room.
 
 ```json
 {not valid json at all}
-```'''
+```"""
 
         result = parse_dm_response(response)
 
@@ -163,7 +164,7 @@ class TestParseDMResponse:
 
     def test_parse_partial_state_changes(self) -> None:
         """Test parsing with only some state change fields."""
-        response = '''You find some gold!
+        response = """You find some gold!
 
 ```json
 {
@@ -171,7 +172,7 @@ class TestParseDMResponse:
     "gold_delta": 15
   }
 }
-```'''
+```"""
 
         result = parse_dm_response(response)
 
@@ -196,11 +197,11 @@ class TestParseDMResponse:
 
     def test_parse_empty_state_changes(self) -> None:
         """Test parsing with empty state_changes object."""
-        response = '''Nothing happens.
+        response = """Nothing happens.
 
 ```json
 {"state_changes": {}}
-```'''
+```"""
 
         result = parse_dm_response(response)
 
@@ -210,7 +211,7 @@ class TestParseDMResponse:
 
     def test_parse_preserves_narrative_formatting(self) -> None:
         """Test that narrative preserves original formatting."""
-        response = '''The ancient tome reads:
+        response = """The ancient tome reads:
 
 "Beware the shadow that walks."
 
@@ -218,7 +219,7 @@ A chill runs down your spine.
 
 ```json
 {"state_changes": {}}
-```'''
+```"""
 
         result = parse_dm_response(response)
 

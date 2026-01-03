@@ -1,4 +1,5 @@
 """Character service - business logic for character CRUD operations."""
+
 from aws_lambda_powertools import Logger
 
 from character.models import CharacterCreateRequest, CharacterUpdateRequest
@@ -31,9 +32,7 @@ class CharacterService:
         """
         self.db = db_client
 
-    def create_character(
-        self, user_id: str, request: CharacterCreateRequest
-    ) -> dict:
+    def create_character(self, user_id: str, request: CharacterCreateRequest) -> dict:
         """Create a new character with rolled stats.
 
         Args:

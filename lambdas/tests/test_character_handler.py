@@ -1,4 +1,5 @@
 """Integration tests for character Lambda handler."""
+
 import json
 from unittest.mock import MagicMock
 

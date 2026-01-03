@@ -210,9 +210,7 @@ class TestDMPromptBuilder:
         assert "Dungeon Master" in prompt
         assert len(prompt) > 1000  # Should be substantial
 
-    def test_build_context(
-        self, mock_character: Character, mock_session: Session
-    ) -> None:
+    def test_build_context(self, mock_character: Character, mock_session: Session) -> None:
         """Test building context from character and session."""
         builder = DMPromptBuilder()
         context = builder.build_context(mock_character, mock_session)

@@ -145,10 +145,20 @@ class TestListSessions:
     def test_list_sessions_filter_by_character(self, service, mock_db):
         """List should filter by character_id when provided."""
         mock_db.query_by_pk.return_value = [
-            {"session_id": "sess-1", "character_id": "char-1", "campaign_setting": "default",
-             "current_location": "Tavern", "created_at": "2026-01-01T00:00:00Z"},
-            {"session_id": "sess-2", "character_id": "char-2", "campaign_setting": "default",
-             "current_location": "Forest", "created_at": "2026-01-02T00:00:00Z"},
+            {
+                "session_id": "sess-1",
+                "character_id": "char-1",
+                "campaign_setting": "default",
+                "current_location": "Tavern",
+                "created_at": "2026-01-01T00:00:00Z",
+            },
+            {
+                "session_id": "sess-2",
+                "character_id": "char-2",
+                "campaign_setting": "default",
+                "current_location": "Forest",
+                "created_at": "2026-01-02T00:00:00Z",
+            },
         ]
         mock_db.get_item.return_value = {"name": "Test"}
 
@@ -263,9 +273,7 @@ class TestGetMessageHistory:
             ],
         }
 
-        result = service.get_message_history(
-            "user-123", "sess-1", before="2026-01-01T00:05:00Z"
-        )
+        result = service.get_message_history("user-123", "sess-1", before="2026-01-01T00:05:00Z")
 
         assert len(result["messages"]) == 1
         assert result["messages"][0]["content"] == "Old"

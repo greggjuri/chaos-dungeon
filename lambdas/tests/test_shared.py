@@ -1,4 +1,5 @@
 """Tests for shared module."""
+
 import pytest
 from moto import mock_aws
 
@@ -80,6 +81,7 @@ class TestConfig:
     def test_config_is_production(self, env_setup):
         """Test is_production property."""
         import os
+
         os.environ["ENVIRONMENT"] = "prod"
         # Clear cache
         if hasattr(get_config, "_config"):
@@ -90,6 +92,7 @@ class TestConfig:
     def test_config_missing_table_name(self, env_setup):
         """Test error when TABLE_NAME is missing."""
         import os
+
         del os.environ["TABLE_NAME"]
         # Clear cache
         if hasattr(get_config, "_config"):

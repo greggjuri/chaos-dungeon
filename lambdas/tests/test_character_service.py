@@ -1,4 +1,5 @@
 """Tests for character service module."""
+
 from unittest.mock import MagicMock, patch
 
 import pytest

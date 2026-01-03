@@ -96,9 +96,7 @@ def mock_session() -> Session:
 class TestFullDMFlow:
     """Integration tests for the complete DM flow."""
 
-    def test_full_dm_flow_combat(
-        self, mock_character: Character, mock_session: Session
-    ) -> None:
+    def test_full_dm_flow_combat(self, mock_character: Character, mock_session: Session) -> None:
         """Integration test: prompt building → combat response parsing."""
         builder = DMPromptBuilder()
 
@@ -124,7 +122,7 @@ class TestFullDMFlow:
         assert user_msg == "[Player Action]: I attack the giant spider!"
 
         # Simulate Claude response with combat
-        mock_response = '''The giant spider hisses and lunges at you! You sidestep and bring your longsword down in a powerful arc. The blade bites deep into the creature's carapace, ichor spraying across the tunnel walls.
+        mock_response = """The giant spider hisses and lunges at you! You sidestep and bring your longsword down in a powerful arc. The blade bites deep into the creature's carapace, ichor spraying across the tunnel walls.
 
 The spider screeches in pain but isn't finished yet. It rears back, fangs dripping with venom, ready to strike again.
 
@@ -143,7 +141,7 @@ The spider screeches in pain but isn't finished yet. It rears back, fangs drippi
     {"name": "Giant Spider", "hp": 8, "ac": 14, "max_hp": 18}
   ]
 }
-```'''
+```"""
 
         # Parse response
         result = parse_dm_response(mock_response)
@@ -183,7 +181,7 @@ The spider screeches in pain but isn't finished yet. It rears back, fangs drippi
         assert len(user_msg) > 0
 
         # Simulate Claude response with discovery
-        mock_response = '''You approach the dark alcove cautiously, torch held high. The shadows retreat to reveal a small cache hidden behind loose stones.
+        mock_response = """You approach the dark alcove cautiously, torch held high. The shadows retreat to reveal a small cache hidden behind loose stones.
 
 Inside, you find a leather pouch containing gold coins and a small vial of shimmering blue liquid. The vial is cool to the touch.
 
@@ -202,7 +200,7 @@ Inside, you find a leather pouch containing gold coins and a small vial of shimm
   ],
   "combat_active": false
 }
-```'''
+```"""
 
         result = parse_dm_response(mock_response)
 
@@ -231,13 +229,13 @@ Inside, you find a leather pouch containing gold coins and a small vial of shimm
         assert len(user_msg) > 0
 
         # Simulate response with no changes
-        mock_response = '''You press your ear against the cold stone wall and listen. From somewhere deeper in the mine, you hear a faint clicking sound. It's rhythmic, almost like... mandibles.
+        mock_response = """You press your ear against the cold stone wall and listen. From somewhere deeper in the mine, you hear a faint clicking sound. It's rhythmic, almost like... mandibles.
 
 The sound fades, then returns. Something is moving down there.
 
 ```json
 {"state_changes": {}}
-```'''
+```"""
 
         result = parse_dm_response(mock_response)
 
@@ -287,7 +285,7 @@ The sound fades, then returns. Something is moving down there.
         assert "Text" in result2.narrative
 
         # Multiple paragraphs before JSON
-        result3 = parse_dm_response('''Para 1.
+        result3 = parse_dm_response("""Para 1.
 
 Para 2.
 
@@ -295,7 +293,7 @@ Para 3.
 
 ```json
 {"state_changes": {"xp_delta": 5}}
-```''')
+```""")
         assert result3.state_changes.xp_delta == 5
         assert "Para 1" in result3.narrative
         assert "Para 3" in result3.narrative

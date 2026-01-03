@@ -111,9 +111,7 @@ Inventory: {inventory_str}"""
         """
         # Format world state flags
         if session.world_state:
-            flags = ", ".join(
-                f"{k}={v}" for k, v in session.world_state.items()
-            )
+            flags = ", ".join(f"{k}={v}" for k, v in session.world_state.items())
         else:
             flags = "None"
 

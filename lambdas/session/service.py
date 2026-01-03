@@ -53,9 +53,7 @@ class SessionService:
             sk_prefix="SESS#",
         )
         if len(existing_sessions) >= MAX_SESSIONS_PER_USER:
-            raise ConflictError(
-                f"Maximum {MAX_SESSIONS_PER_USER} sessions allowed per user"
-            )
+            raise ConflictError(f"Maximum {MAX_SESSIONS_PER_USER} sessions allowed per user")
 
         # 3. Get starting location and create opening message
         campaign = request.campaign_setting.value

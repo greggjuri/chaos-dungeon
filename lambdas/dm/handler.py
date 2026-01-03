@@ -31,9 +31,7 @@ tracer = Tracer()
 
 config = get_config()
 cors_config = CORSConfig(
-    allow_origin=(
-        "https://chaos.jurigregg.com" if config.is_production else "*"
-    ),
+    allow_origin=("https://chaos.jurigregg.com" if config.is_production else "*"),
     allow_headers=["Content-Type", "X-User-ID", "X-User-Id"],
 )
 app = APIGatewayRestResolver(cors=cors_config)

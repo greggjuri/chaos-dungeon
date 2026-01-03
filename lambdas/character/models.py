@@ -1,4 +1,5 @@
 """Pydantic models for character API requests and responses."""
+
 import re
 from typing import Any
 
@@ -9,9 +10,7 @@ class CharacterCreateRequest(BaseModel):
     """Request body for creating a new character."""
 
     name: str = Field(..., min_length=3, max_length=30)
-    character_class: str = Field(
-        ..., pattern="^(fighter|thief|magic_user|cleric)$"
-    )
+    character_class: str = Field(..., pattern="^(fighter|thief|magic_user|cleric)$")
 
     @field_validator("name")
     @classmethod

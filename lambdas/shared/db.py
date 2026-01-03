@@ -1,4 +1,5 @@
 """DynamoDB client wrapper for single-table design."""
+
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any

@@ -74,11 +74,13 @@ def build_system_prompt(campaign: str = "default") -> str:
     """
     campaign_prompt = get_campaign_prompt(campaign)
 
-    return "\n\n".join([
-        DM_IDENTITY,
-        BECMI_RULES,
-        OUTPUT_FORMAT,
-        CONTENT_GUIDELINES,
-        DEATH_INSTRUCTIONS,
-        campaign_prompt,
-    ])
+    return "\n\n".join(
+        [
+            DM_IDENTITY,
+            BECMI_RULES,
+            OUTPUT_FORMAT,
+            CONTENT_GUIDELINES,
+            DEATH_INSTRUCTIONS,
+            campaign_prompt,
+        ]
+    )

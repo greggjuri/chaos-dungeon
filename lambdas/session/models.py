@@ -25,9 +25,7 @@ class SessionCreateRequest(BaseModel):
     @classmethod
     def validate_uuid(cls, v: str) -> str:
         """Validate that character_id is a valid UUID v4."""
-        uuid_pattern = (
-            r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-        )
+        uuid_pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
         if not re.match(uuid_pattern, v.lower()):
             raise ValueError("character_id must be a valid UUID v4")
         return v

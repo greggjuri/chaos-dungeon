@@ -66,9 +66,7 @@ def _build_response(narrative: str, data: dict[str, Any]) -> DMResponse:
     state_changes = StateChanges(**state_data)
 
     # Parse dice rolls
-    dice_rolls = [
-        DiceRoll(**roll_data) for roll_data in data.get("dice_rolls", [])
-    ]
+    dice_rolls = [DiceRoll(**roll_data) for roll_data in data.get("dice_rolls", [])]
 
     # Parse enemies
     enemies = [Enemy(**enemy_data) for enemy_data in data.get("enemies", [])]

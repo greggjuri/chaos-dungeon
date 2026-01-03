@@ -1,14 +1,28 @@
 """DM service for processing player actions."""
 
 from datetime import UTC, datetime
+from uuid import uuid4
 
 from aws_lambda_powertools import Logger
 
+from dm.bestiary import spawn_enemy
 from dm.claude_client import ClaudeClient
-from dm.models import ActionResponse, CharacterSnapshot, DMResponse
+from dm.combat import CombatResolver
+from dm.models import (
+    ActionResponse,
+    CharacterSnapshot,
+    CombatEnemy,
+    CombatState,
+    DiceRoll,
+    DMResponse,
+    Enemy,
+    StateChanges,
+)
 from dm.parser import parse_dm_response
 from dm.prompts import DMPromptBuilder
+from dm.prompts.combat_prompt import build_combat_outcome_prompt
 from shared.db import DynamoDBClient, convert_floats_to_decimal
+from shared.dice import roll as roll_dice_notation
 from shared.exceptions import GameStateError, NotFoundError
 from shared.models import AbilityScores, Character, Item, Message, Session
 from shared.secrets import get_claude_api_key
@@ -21,9 +35,7 @@ MAX_MESSAGE_HISTORY = 50
 class DMService:
     """Service for processing player actions through Claude."""
 
-    def __init__(
-        self, db: DynamoDBClient, claude_client: ClaudeClient | None = None
-    ):
+    def __init__(self, db: DynamoDBClient, claude_client: ClaudeClient | None = None):
         """Initialize DM service.
 
         Args:
@@ -33,6 +45,7 @@ class DMService:
         self.db = db
         self.claude_client = claude_client
         self.prompt_builder = DMPromptBuilder()
+        self.combat_resolver = CombatResolver()
 
     def _get_claude_client(self) -> ClaudeClient:
         """Lazy initialization of Claude client."""
@@ -48,6 +61,8 @@ class DMService:
         action: str,
     ) -> ActionResponse:
         """Process a player action and return the DM response.
+
+        Routes to combat or normal action processing based on combat state.
 
         Args:
             session_id: Session UUID
@@ -89,10 +104,182 @@ class DMService:
                 "session_id": session_id,
                 "character_id": character_id,
                 "action_length": len(action),
+                "combat_active": session.get("combat_state", {}).get("active", False),
             },
         )
 
-        # Build prompts
+        # Check if we're in active combat
+        combat_state = session.get("combat_state", {})
+        if combat_state.get("active"):
+            response = self._process_combat_action(session, character, action, user_id, session_id)
+        else:
+            response = self._process_normal_action(session, character, action, user_id, session_id)
+
+        # Save updates to DynamoDB
+        now = datetime.now(UTC).isoformat()
+        character["updated_at"] = now
+        session["updated_at"] = now
+
+        char_data = convert_floats_to_decimal(
+            {k: v for k, v in character.items() if k not in ("PK", "SK")}
+        )
+        session_data = convert_floats_to_decimal(
+            {k: v for k, v in session.items() if k not in ("PK", "SK")}
+        )
+
+        self.db.put_item(char_pk, char_sk, char_data)
+        self.db.put_item(session_pk, session_sk, session_data)
+
+        return response
+
+    def _process_combat_action(
+        self,
+        session: dict,
+        character: dict,
+        action: str,
+        user_id: str,
+        session_id: str,
+    ) -> ActionResponse:
+        """Process an action during active combat.
+
+        Combat is resolved mechanically on the server, then Claude narrates.
+
+        Args:
+            session: Session dict from DynamoDB
+            character: Character dict from DynamoDB
+            action: Player's action text
+            user_id: User UUID
+            session_id: Session UUID
+
+        Returns:
+            ActionResponse with combat results
+        """
+        # Load combat state
+        combat_state_dict = session.get("combat_state", {})
+        combat_enemies_data = session.get("combat_enemies", [])
+
+        combat_state = CombatState(**combat_state_dict)
+        combat_state.round += 1
+
+        combat_enemies = [CombatEnemy(**e) for e in combat_enemies_data]
+
+        logger.info(
+            "Resolving combat round",
+            extra={
+                "round": combat_state.round,
+                "enemies": len(combat_enemies),
+            },
+        )
+
+        # Resolve combat mechanically
+        round_result = self.combat_resolver.resolve_combat_round(
+            character, combat_state, combat_enemies
+        )
+
+        # Build outcome prompt for Claude - it can only narrate, not decide
+        outcome_prompt = build_combat_outcome_prompt(
+            round_result,
+            character["name"],
+            character["max_hp"],
+        )
+
+        # Get narrative from Claude
+        campaign = session.get("campaign_setting", "default")
+        system_prompt = self.prompt_builder.build_system_prompt(campaign)
+        client = self._get_claude_client()
+        raw_response = client.send_action(system_prompt, outcome_prompt, action)
+
+        # Parse response (only for narrative, state is from combat)
+        dm_response = parse_dm_response(raw_response)
+
+        # Apply XP from combat
+        character["xp"] += round_result.xp_gained
+
+        # Build dice rolls from attack results
+        dice_rolls = self._build_combat_dice_rolls(round_result)
+
+        # Update combat state in session
+        if round_result.combat_ended:
+            session["combat_state"] = {"active": False, "round": 0}
+            session["combat_enemies"] = []
+            logger.info(
+                "Combat ended",
+                extra={"player_dead": round_result.player_dead},
+            )
+        else:
+            session["combat_state"] = combat_state.model_dump()
+            session["combat_enemies"] = [e.model_dump() for e in combat_enemies if e.hp > 0]
+
+        # Update message history
+        session = self._append_messages(session, action, dm_response.narrative)
+
+        # Check for character death
+        character_dead = round_result.player_dead
+        session_ended = round_result.player_dead
+        if character_dead:
+            session["status"] = "ended"
+            session["ended_reason"] = "character_death"
+            logger.info(
+                "Character died in combat",
+                extra={"character": character["name"]},
+            )
+
+        # Build response
+        inventory_names = [
+            item["name"] if isinstance(item, dict) else item
+            for item in character.get("inventory", [])
+        ]
+
+        # Convert remaining enemies to Enemy models for response
+        remaining_enemies = [
+            Enemy(name=e.name, hp=e.hp, ac=e.ac, max_hp=e.max_hp)
+            for e in round_result.enemies_remaining
+        ]
+
+        return ActionResponse(
+            narrative=dm_response.narrative,
+            state_changes=StateChanges(
+                hp_delta=round_result.player_hp - character.get("max_hp", 0),
+                xp_delta=round_result.xp_gained,
+            ),
+            dice_rolls=dice_rolls,
+            combat_active=not round_result.combat_ended,
+            enemies=remaining_enemies,
+            character=CharacterSnapshot(
+                hp=character["hp"],
+                max_hp=character["max_hp"],
+                xp=character["xp"],
+                gold=character["gold"],
+                level=character["level"],
+                inventory=inventory_names,
+            ),
+            character_dead=character_dead,
+            session_ended=session_ended,
+        )
+
+    def _process_normal_action(
+        self,
+        session: dict,
+        character: dict,
+        action: str,
+        user_id: str,
+        session_id: str,
+    ) -> ActionResponse:
+        """Process a normal (non-combat) action.
+
+        Claude handles narrative and may initiate combat.
+
+        Args:
+            session: Session dict from DynamoDB
+            character: Character dict from DynamoDB
+            action: Player's action text
+            user_id: User UUID
+            session_id: Session UUID
+
+        Returns:
+            ActionResponse with narrative and state changes
+        """
+        character_id = session["character_id"]
         campaign = session.get("campaign_setting", "default")
         system_prompt = self.prompt_builder.build_system_prompt(campaign)
 
@@ -122,9 +309,7 @@ class DMService:
             campaign_setting=campaign,
             current_location=session.get("current_location", "Unknown"),
             world_state=session.get("world_state", {}),
-            message_history=[
-                Message(**m) for m in session.get("message_history", [])
-            ],
+            message_history=[Message(**m) for m in session.get("message_history", [])],
         )
 
         context = self.prompt_builder.build_context(char_model, sess_model)
@@ -136,10 +321,12 @@ class DMService:
         # Parse response
         dm_response = parse_dm_response(raw_response)
 
+        # Check if Claude initiated combat
+        if dm_response.combat_active and dm_response.enemies:
+            self._initiate_combat(session, dm_response.enemies)
+
         # Apply state changes
-        character, session = self._apply_state_changes(
-            character, session, dm_response
-        )
+        character, session = self._apply_state_changes(character, session, dm_response)
 
         # Update message history
         session = self._append_messages(session, action, dm_response.narrative)
@@ -156,22 +343,6 @@ class DMService:
                 "Character died",
                 extra={"character_id": character_id, "session_id": session_id},
             )
-
-        # Save updates to DynamoDB
-        now = datetime.now(UTC).isoformat()
-        character["updated_at"] = now
-        session["updated_at"] = now
-
-        # Convert floats to Decimal for DynamoDB compatibility
-        char_data = convert_floats_to_decimal(
-            {k: v for k, v in character.items() if k not in ("PK", "SK")}
-        )
-        session_data = convert_floats_to_decimal(
-            {k: v for k, v in session.items() if k not in ("PK", "SK")}
-        )
-
-        self.db.put_item(char_pk, char_sk, char_data)
-        self.db.put_item(session_pk, session_sk, session_data)
 
         # Build response
         inventory_names = [
@@ -196,6 +367,89 @@ class DMService:
             character_dead=character_dead,
             session_ended=session_ended,
         )
+
+    def _initiate_combat(self, session: dict, enemies: list[Enemy]) -> None:
+        """Start combat with enemies from Claude's response.
+
+        Args:
+            session: Session dict to update
+            enemies: Enemies from Claude's response
+        """
+        combat_enemies = []
+        for enemy in enemies:
+            try:
+                # Try to spawn from bestiary
+                spawned = spawn_enemy(enemy.name)
+                combat_enemies.append(spawned.model_dump())
+            except ValueError:
+                # Unknown enemy - use stats from Claude's response
+                combat_enemies.append(
+                    {
+                        "id": str(uuid4()),
+                        "name": enemy.name,
+                        "hp": enemy.hp,
+                        "max_hp": enemy.max_hp or enemy.hp,
+                        "ac": enemy.ac,
+                        "attack_bonus": 1,
+                        "damage_dice": "1d6",
+                        "xp_value": max(10, enemy.hp * 2),
+                    }
+                )
+
+        # Roll initiative
+        player_init, _ = roll_dice_notation("1d6")
+        enemy_init, _ = roll_dice_notation("1d6")
+
+        session["combat_state"] = {
+            "active": True,
+            "round": 0,
+            "player_initiative": player_init,
+            "enemy_initiative": enemy_init,
+        }
+        session["combat_enemies"] = combat_enemies
+
+        logger.info(
+            "Combat initiated",
+            extra={
+                "enemies": len(combat_enemies),
+                "player_init": player_init,
+                "enemy_init": enemy_init,
+            },
+        )
+
+    def _build_combat_dice_rolls(self, round_result) -> list[DiceRoll]:
+        """Build DiceRoll list from combat round result.
+
+        Args:
+            round_result: CombatRoundResult from combat resolution
+
+        Returns:
+            List of DiceRoll for the response
+        """
+        dice_rolls = []
+        for attack in round_result.attack_results:
+            # Attack roll
+            dice_rolls.append(
+                DiceRoll(
+                    type="attack",
+                    roll=attack.attack_roll,
+                    modifier=attack.attack_bonus,
+                    total=attack.attack_total,
+                    success=attack.is_hit,
+                )
+            )
+            # Damage roll if hit
+            if attack.is_hit and attack.damage > 0:
+                dice_rolls.append(
+                    DiceRoll(
+                        type="damage",
+                        roll=sum(attack.damage_rolls) if attack.damage_rolls else attack.damage,
+                        modifier=0,
+                        total=attack.damage,
+                        success=True,
+                    )
+                )
+        return dice_rolls
 
     def _apply_state_changes(
         self,
@@ -227,9 +481,7 @@ class DMService:
 
         # Inventory changes - handle both Item objects and strings
         inventory = character.get("inventory", [])
-        inventory_names = [
-            item["name"] if isinstance(item, dict) else item for item in inventory
-        ]
+        inventory_names = [item["name"] if isinstance(item, dict) else item for item in inventory]
 
         for item_name in state.inventory_add:
             if item_name not in inventory_names:
@@ -254,12 +506,13 @@ class DMService:
         if state.world_state:
             session.setdefault("world_state", {}).update(state.world_state)
 
-        # Track combat state
-        session["combat_active"] = dm_response.combat_active
-        if dm_response.enemies:
-            session["enemies"] = [e.model_dump() for e in dm_response.enemies]
-        elif not dm_response.combat_active:
-            session["enemies"] = []
+        # Track combat state (for non-combat actions, Claude may report enemies)
+        if not session.get("combat_state", {}).get("active"):
+            session["combat_active"] = dm_response.combat_active
+            if dm_response.enemies:
+                session["enemies"] = [e.model_dump() for e in dm_response.enemies]
+            elif not dm_response.combat_active:
+                session["enemies"] = []
 
         return character, session
 

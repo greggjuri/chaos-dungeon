@@ -1,4 +1,5 @@
 """Character Lambda handler for CRUD operations."""
+
 from typing import Any
 
 from aws_lambda_powertools import Logger, Tracer
@@ -22,11 +23,7 @@ from shared.utils import extract_user_id
 
 logger = Logger()
 tracer = Tracer()
-cors_config = CORSConfig(
-    allow_origin="*",
-    allow_headers=["Content-Type", "X-User-Id"],
-    max_age=300
-)
+cors_config = CORSConfig(allow_origin="*", allow_headers=["Content-Type", "X-User-Id"], max_age=300)
 app = APIGatewayRestResolver(cors=cors_config)
 
 # Initialize service lazily

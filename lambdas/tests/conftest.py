@@ -1,4 +1,5 @@
 """Pytest fixtures for Chaos Dungeon tests."""
+
 import os
 
 import boto3
@@ -25,6 +26,7 @@ def env_setup():
     yield
     # Clean up config cache
     from shared.config import get_config
+
     if hasattr(get_config, "_config"):
         delattr(get_config, "_config")
 

@@ -1,6 +1,7 @@
 """Pydantic models for DM response parsing and action handling."""
 
 from typing import Any
+from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -57,9 +58,10 @@ class DiceRoll(BaseModel):
 
 
 class Enemy(BaseModel):
-    """Enemy state during combat.
+    """Enemy state during combat (basic, from Claude response).
 
     Tracks the current status of enemies in an encounter.
+    Used when parsing Claude's response for enemy info.
     """
 
     name: str
@@ -73,6 +75,135 @@ class Enemy(BaseModel):
 
     max_hp: int | None = None
     """Maximum HP (optional, for display)."""
+
+
+class CombatState(BaseModel):
+    """Active combat encounter state.
+
+    Tracks the current state of an ongoing combat encounter,
+    including initiative and round number.
+    """
+
+    active: bool = False
+    """Whether combat is currently active."""
+
+    round: int = 0
+    """Current combat round number."""
+
+    player_initiative: int = 0
+    """Player's initiative roll for this combat."""
+
+    enemy_initiative: int = 0
+    """Enemies' initiative roll for this combat."""
+
+
+class CombatEnemy(BaseModel):
+    """Enemy with full combat stats for server-side resolution.
+
+    Extends the basic Enemy with additional fields needed for
+    mechanical combat resolution (attack bonus, damage dice, etc.).
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    """Unique ID for tracking individual enemies."""
+
+    name: str
+    """Enemy name/type."""
+
+    hp: int
+    """Current hit points."""
+
+    max_hp: int
+    """Maximum hit points."""
+
+    ac: int
+    """Armor class."""
+
+    attack_bonus: int = 0
+    """Bonus to attack rolls."""
+
+    damage_dice: str = "1d6"
+    """Damage dice notation (e.g., '1d6', '2d4+1')."""
+
+    xp_value: int = 10
+    """XP awarded when defeated."""
+
+
+class AttackResult(BaseModel):
+    """Result of a single attack.
+
+    Captures all details of an attack roll for display and logging.
+    """
+
+    attacker: str
+    """Name of the attacker."""
+
+    defender: str
+    """Name of the defender."""
+
+    attack_roll: int
+    """Natural d20 roll (before modifiers)."""
+
+    attack_bonus: int
+    """Modifier applied to the attack roll."""
+
+    attack_total: int
+    """Final attack roll (natural + bonus)."""
+
+    target_ac: int
+    """Target's armor class."""
+
+    is_hit: bool
+    """Whether the attack hit."""
+
+    is_critical: bool = False
+    """Whether this was a critical hit (natural 20)."""
+
+    is_fumble: bool = False
+    """Whether this was a fumble (natural 1)."""
+
+    damage: int = 0
+    """Damage dealt (0 if miss)."""
+
+    damage_rolls: list[int] = Field(default_factory=list)
+    """Individual damage dice results."""
+
+    target_hp_before: int
+    """Target's HP before this attack."""
+
+    target_hp_after: int
+    """Target's HP after this attack."""
+
+    target_dead: bool = False
+    """Whether this attack killed the target."""
+
+
+class CombatRoundResult(BaseModel):
+    """Result of a full combat round.
+
+    Aggregates all attacks in a round and tracks combat state.
+    """
+
+    round: int
+    """Round number."""
+
+    attack_results: list[AttackResult]
+    """All attacks that occurred this round."""
+
+    player_hp: int
+    """Player's HP after this round."""
+
+    player_dead: bool
+    """Whether the player died this round."""
+
+    enemies_remaining: list[CombatEnemy]
+    """Enemies still alive after this round."""
+
+    combat_ended: bool
+    """Whether combat ended this round."""
+
+    xp_gained: int = 0
+    """XP earned from kills this round."""
 
 
 class DMResponse(BaseModel):

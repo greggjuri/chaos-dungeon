@@ -14,7 +14,7 @@
 - [ ] init-08-state-parsing.md - Parse DM responses for state changes
 
 ### To Do (Phase 3 - Game Systems)
-- [ ] init-09-combat-system.md - BECMI combat mechanics
+- [x] init-07-combat-system.md - Server-side combat resolution
 - [ ] init-10-inventory.md - Item management
 - [ ] init-11-dice-rolling.md - Dice mechanics with UI
 - [ ] init-12-leveling.md - XP and level progression
@@ -34,6 +34,7 @@
 - [x] init-04-frontend-shell.md - React app with routing, pages, API services, user context, age gate
 - [x] init-05-dm-system-prompt.md - DM prompt engineering with BECMI rules, campaign prompts, response parser
 - [x] init-06-action-handler.md - DM Lambda with Claude API, action processing, state changes
+- [x] init-07-combat-system.md - Server-side combat resolution with dice, bestiary, combat resolver
 
 ---
 
@@ -52,4 +53,4 @@ None currently.
 
 ---
 
-*Last updated: 2026-01-02 (init-06 complete)*
+*Last updated: 2026-01-02 (init-07 combat system complete)*

@@ -33,9 +33,7 @@ def get_starting_location(campaign: str) -> str:
     Returns:
         The starting location description
     """
-    return CAMPAIGN_SETTINGS.get(campaign, CAMPAIGN_SETTINGS["default"])[
-        "starting_location"
-    ]
+    return CAMPAIGN_SETTINGS.get(campaign, CAMPAIGN_SETTINGS["default"])["starting_location"]
 
 
 def get_opening_message(campaign: str, character_name: str) -> str:

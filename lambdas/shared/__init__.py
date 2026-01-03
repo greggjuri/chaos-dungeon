@@ -1,4 +1,5 @@
 """Shared utilities for Chaos Dungeon Lambda functions."""
+
 from .config import Config
 from .db import DynamoDBClient
 from .exceptions import (

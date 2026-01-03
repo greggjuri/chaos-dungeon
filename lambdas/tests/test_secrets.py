@@ -16,9 +16,7 @@ class TestGetClaudeApiKey:
         secrets.get_claude_api_key.cache_clear()
 
         mock_ssm = MagicMock()
-        mock_ssm.get_parameter.return_value = {
-            "Parameter": {"Value": "test-api-key-12345"}
-        }
+        mock_ssm.get_parameter.return_value = {"Parameter": {"Value": "test-api-key-12345"}}
 
         with patch("boto3.client", return_value=mock_ssm):
             result = secrets.get_claude_api_key()
@@ -39,9 +37,7 @@ class TestGetClaudeApiKey:
         secrets.get_claude_api_key.cache_clear()
 
         mock_ssm = MagicMock()
-        mock_ssm.get_parameter.return_value = {
-            "Parameter": {"Value": "custom-key"}
-        }
+        mock_ssm.get_parameter.return_value = {"Parameter": {"Value": "custom-key"}}
 
         with (
             patch("boto3.client", return_value=mock_ssm),
@@ -67,9 +63,7 @@ class TestGetClaudeApiKey:
         secrets.get_claude_api_key.cache_clear()
 
         mock_ssm = MagicMock()
-        mock_ssm.get_parameter.return_value = {
-            "Parameter": {"Value": "cached-key"}
-        }
+        mock_ssm.get_parameter.return_value = {"Parameter": {"Value": "cached-key"}}
 
         with patch("boto3.client", return_value=mock_ssm):
             result1 = secrets.get_claude_api_key()

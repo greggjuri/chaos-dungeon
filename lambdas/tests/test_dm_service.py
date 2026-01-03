@@ -113,9 +113,7 @@ class TestApplyStateChanges:
             state_changes=StateChanges(hp_delta=3),
         )
 
-        char, _ = service._apply_state_changes(
-            sample_character, sample_session, dm_response
-        )
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
         assert char["hp"] == 8
 
@@ -126,9 +124,7 @@ class TestApplyStateChanges:
             state_changes=StateChanges(hp_delta=-3),
         )
 
-        char, _ = service._apply_state_changes(
-            sample_character, sample_session, dm_response
-        )
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
         assert char["hp"] == 5
 
@@ -139,9 +135,7 @@ class TestApplyStateChanges:
             state_changes=StateChanges(hp_delta=100),
         )
 
-        char, _ = service._apply_state_changes(
-            sample_character, sample_session, dm_response
-        )
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
         assert char["hp"] == sample_character["max_hp"]
 
@@ -152,9 +146,7 @@ class TestApplyStateChanges:
             state_changes=StateChanges(hp_delta=-100),
         )
 
-        char, _ = service._apply_state_changes(
-            sample_character, sample_session, dm_response
-        )
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
         assert char["hp"] == 0
 
@@ -165,9 +157,7 @@ class TestApplyStateChanges:
             state_changes=StateChanges(gold_delta=50),
         )
 
-        char, _ = service._apply_state_changes(
-            sample_character, sample_session, dm_response
-        )
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
         assert char["gold"] == 150
 
@@ -178,9 +168,7 @@ class TestApplyStateChanges:
             state_changes=StateChanges(gold_delta=-30),
         )
 
-        char, _ = service._apply_state_changes(
-            sample_character, sample_session, dm_response
-        )
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
         assert char["gold"] == 70
 
@@ -191,9 +179,7 @@ class TestApplyStateChanges:
             state_changes=StateChanges(gold_delta=-1000),
         )
 
-        char, _ = service._apply_state_changes(
-            sample_character, sample_session, dm_response
-        )
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
         assert char["gold"] == 0
 
@@ -204,9 +190,7 @@ class TestApplyStateChanges:
             state_changes=StateChanges(xp_delta=100),
         )
 
-        char, _ = service._apply_state_changes(
-            sample_character, sample_session, dm_response
-        )
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
         assert char["xp"] == 100
 
@@ -217,9 +201,7 @@ class TestApplyStateChanges:
             state_changes=StateChanges(inventory_add=["Potion", "Key"]),
         )
 
-        char, _ = service._apply_state_changes(
-            sample_character, sample_session, dm_response
-        )
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
         inventory_names = [item["name"] for item in char["inventory"]]
         assert "Potion" in inventory_names
@@ -233,9 +215,7 @@ class TestApplyStateChanges:
         )
 
         original_count = len(sample_character["inventory"])
-        char, _ = service._apply_state_changes(
-            sample_character, sample_session, dm_response
-        )
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
         assert len(char["inventory"]) == original_count
 
@@ -246,9 +226,7 @@ class TestApplyStateChanges:
             state_changes=StateChanges(inventory_remove=["Shield"]),
         )
 
-        char, _ = service._apply_state_changes(
-            sample_character, sample_session, dm_response
-        )
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
         inventory_names = [item["name"] for item in char["inventory"]]
         assert "Shield" not in inventory_names
@@ -262,9 +240,7 @@ class TestApplyStateChanges:
         )
 
         # Should not raise
-        char, _ = service._apply_state_changes(
-            sample_character, sample_session, dm_response
-        )
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
         assert len(char["inventory"]) == 2  # Unchanged
 
@@ -275,9 +251,7 @@ class TestApplyStateChanges:
             state_changes=StateChanges(location="Dark Forest"),
         )
 
-        _, session = service._apply_state_changes(
-            sample_character, sample_session, dm_response
-        )
+        _, session = service._apply_state_changes(sample_character, sample_session, dm_response)
 
         assert session["current_location"] == "Dark Forest"
 
@@ -288,9 +262,7 @@ class TestApplyStateChanges:
             state_changes=StateChanges(),
         )
 
-        _, session = service._apply_state_changes(
-            sample_character, sample_session, dm_response
-        )
+        _, session = service._apply_state_changes(sample_character, sample_session, dm_response)
 
         assert session["current_location"] == "Tavern"
 
@@ -301,9 +273,7 @@ class TestApplyStateChanges:
             state_changes=StateChanges(world_state={"found_treasure": True}),
         )
 
-        _, session = service._apply_state_changes(
-            sample_character, sample_session, dm_response
-        )
+        _, session = service._apply_state_changes(sample_character, sample_session, dm_response)
 
         assert session["world_state"]["met_bartender"] is True
         assert session["world_state"]["found_treasure"] is True
@@ -316,9 +286,7 @@ class TestApplyStateChanges:
             enemies=[Enemy(name="Goblin", hp=5, ac=12)],
         )
 
-        _, session = service._apply_state_changes(
-            sample_character, sample_session, dm_response
-        )
+        _, session = service._apply_state_changes(sample_character, sample_session, dm_response)
 
         assert session["combat_active"] is True
         assert len(session["enemies"]) == 1
@@ -333,9 +301,7 @@ class TestApplyStateChanges:
             combat_active=False,
         )
 
-        _, session = service._apply_state_changes(
-            sample_character, sample_session, dm_response
-        )
+        _, session = service._apply_state_changes(sample_character, sample_session, dm_response)
 
         assert session["combat_active"] is False
         assert session["enemies"] == []
@@ -349,9 +315,7 @@ class TestAppendMessages:
         with patch("dm.service.datetime") as mock_dt:
             mock_dt.now.return_value.isoformat.return_value = "2026-01-01T12:00:00Z"
 
-            session = service._append_messages(
-                sample_session, "I attack", "You swing your sword!"
-            )
+            session = service._append_messages(sample_session, "I attack", "You swing your sword!")
 
         assert len(session["message_history"]) == 2
         assert session["message_history"][0]["role"] == "player"
@@ -388,9 +352,7 @@ class TestAppendMessages:
 class TestProcessAction:
     """Tests for process_action method."""
 
-    def test_process_action_success(
-        self, service, mock_db, sample_session, sample_character
-    ):
+    def test_process_action_success(self, service, mock_db, sample_session, sample_character):
         """process_action should return ActionResponse on success."""
         mock_db.get_item.side_effect = [sample_session, sample_character]
 
@@ -417,9 +379,7 @@ class TestProcessAction:
 
         assert exc_info.value.resource_type == "session"
 
-    def test_process_action_character_not_found(
-        self, service, mock_db, sample_session
-    ):
+    def test_process_action_character_not_found(self, service, mock_db, sample_session):
         """process_action should raise NotFoundError for missing character."""
         mock_db.get_item.side_effect = [sample_session, None]
 
@@ -476,9 +436,7 @@ class TestProcessAction:
         assert result.session_ended is True
         assert result.character.hp == 0
 
-    def test_process_action_saves_updates(
-        self, service, mock_db, sample_session, sample_character
-    ):
+    def test_process_action_saves_updates(self, service, mock_db, sample_session, sample_character):
         """process_action should save character and session updates."""
         mock_db.get_item.side_effect = [sample_session, sample_character]
 

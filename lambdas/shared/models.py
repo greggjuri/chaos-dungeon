@@ -1,4 +1,5 @@
 """Pydantic models for Chaos Dungeon game entities."""
+
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
@@ -48,9 +49,7 @@ class Message(BaseModel):
 
     role: MessageRole
     content: str = Field(..., min_length=1)
-    timestamp: str = Field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class Character(BaseModel):
@@ -67,9 +66,7 @@ class Character(BaseModel):
     gold: int = Field(default=0, ge=0)
     abilities: AbilityScores
     inventory: list[Item] = Field(default_factory=list)
-    created_at: str = Field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     updated_at: str | None = None
 
     def to_db_keys(self) -> tuple[str, str]:
@@ -119,9 +116,7 @@ class Session(BaseModel):
     current_location: str = Field(default="Unknown")
     world_state: dict[str, Any] = Field(default_factory=dict)
     message_history: list[Message] = Field(default_factory=list)
-    created_at: str = Field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     updated_at: str | None = None
 
     def to_db_keys(self) -> tuple[str, str]:
@@ -157,9 +152,7 @@ class Session(BaseModel):
         user_id = item["PK"].replace("USER#", "")
         session_id = item["SK"].replace("SESS#", "")
         # Convert message history from dict format
-        message_history = [
-            Message(**msg) for msg in item.get("message_history", [])
-        ]
+        message_history = [Message(**msg) for msg in item.get("message_history", [])]
         return cls(
             user_id=user_id,
             session_id=session_id,
