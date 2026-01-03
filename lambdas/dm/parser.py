@@ -69,10 +69,21 @@ def _build_response(narrative: str, data: dict[str, Any]) -> DMResponse:
     dice_rolls = [DiceRoll(**roll_data) for roll_data in data.get("dice_rolls", [])]
 
     # Parse enemies
-    enemies = [Enemy(**enemy_data) for enemy_data in data.get("enemies", [])]
+    enemies_data = data.get("enemies", [])
+    enemies = [Enemy(**enemy_data) for enemy_data in enemies_data]
 
     # Get combat status
     combat_active = data.get("combat_active", False)
+
+    logger.debug(
+        "Parsed DM response JSON",
+        extra={
+            "combat_active": combat_active,
+            "enemies_count": len(enemies),
+            "enemies_raw": enemies_data,
+            "state_changes": state_data,
+        },
+    )
 
     return DMResponse(
         narrative=narrative,

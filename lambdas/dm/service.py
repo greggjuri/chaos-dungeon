@@ -321,8 +321,32 @@ class DMService:
         # Parse response
         dm_response = parse_dm_response(raw_response)
 
+        # Debug logging for combat initiation
+        logger.debug(
+            "Parsed DM response for combat check",
+            extra={
+                "combat_active": dm_response.combat_active,
+                "enemies_count": len(dm_response.enemies) if dm_response.enemies else 0,
+                "enemies": [e.model_dump() for e in dm_response.enemies]
+                if dm_response.enemies
+                else [],
+            },
+        )
+
         # Check if Claude initiated combat
-        if dm_response.combat_active and dm_response.enemies:
+        # Note: If enemies are present, we should initiate combat even if combat_active is False
+        should_initiate_combat = dm_response.enemies and len(dm_response.enemies) > 0
+
+        logger.info(
+            "Combat initiation check",
+            extra={
+                "should_initiate": should_initiate_combat,
+                "combat_active_from_claude": dm_response.combat_active,
+                "has_enemies": bool(dm_response.enemies),
+            },
+        )
+
+        if should_initiate_combat:
             self._initiate_combat(session, dm_response.enemies)
 
         # Apply state changes
@@ -350,12 +374,33 @@ class DMService:
             for item in character.get("inventory", [])
         ]
 
+        # Use session combat state (set by _initiate_combat) rather than Claude's response
+        is_combat_active = session.get("combat_state", {}).get("active", False)
+
+        # Get enemies from session if combat is active, otherwise from Claude's response
+        if is_combat_active:
+            combat_enemies_data = session.get("combat_enemies", [])
+            response_enemies = [
+                Enemy(name=e["name"], hp=e["hp"], ac=e["ac"], max_hp=e.get("max_hp", e["hp"]))
+                for e in combat_enemies_data
+            ]
+        else:
+            response_enemies = dm_response.enemies
+
+        logger.debug(
+            "Building action response",
+            extra={
+                "combat_active": is_combat_active,
+                "enemies_count": len(response_enemies) if response_enemies else 0,
+            },
+        )
+
         return ActionResponse(
             narrative=dm_response.narrative,
             state_changes=dm_response.state_changes,
             dice_rolls=dm_response.dice_rolls,
-            combat_active=dm_response.combat_active,
-            enemies=dm_response.enemies,
+            combat_active=is_combat_active,
+            enemies=response_enemies,
             character=CharacterSnapshot(
                 hp=character["hp"],
                 max_hp=character["max_hp"],
@@ -375,25 +420,39 @@ class DMService:
             session: Session dict to update
             enemies: Enemies from Claude's response
         """
+        logger.info(
+            "Initiating combat",
+            extra={
+                "enemies_from_claude": [e.model_dump() for e in enemies],
+            },
+        )
+
         combat_enemies = []
         for enemy in enemies:
             try:
                 # Try to spawn from bestiary
                 spawned = spawn_enemy(enemy.name)
                 combat_enemies.append(spawned.model_dump())
+                logger.debug(
+                    "Spawned enemy from bestiary",
+                    extra={"enemy_name": enemy.name, "spawned": spawned.model_dump()},
+                )
             except ValueError:
                 # Unknown enemy - use stats from Claude's response
-                combat_enemies.append(
-                    {
-                        "id": str(uuid4()),
-                        "name": enemy.name,
-                        "hp": enemy.hp,
-                        "max_hp": enemy.max_hp or enemy.hp,
-                        "ac": enemy.ac,
-                        "attack_bonus": 1,
-                        "damage_dice": "1d6",
-                        "xp_value": max(10, enemy.hp * 2),
-                    }
+                fallback_enemy = {
+                    "id": str(uuid4()),
+                    "name": enemy.name,
+                    "hp": enemy.hp,
+                    "max_hp": enemy.max_hp or enemy.hp,
+                    "ac": enemy.ac,
+                    "attack_bonus": 1,
+                    "damage_dice": "1d6",
+                    "xp_value": max(10, enemy.hp * 2),
+                }
+                combat_enemies.append(fallback_enemy)
+                logger.debug(
+                    "Using Claude stats for unknown enemy",
+                    extra={"enemy_name": enemy.name, "fallback": fallback_enemy},
                 )
 
         # Roll initiative
@@ -409,11 +468,12 @@ class DMService:
         session["combat_enemies"] = combat_enemies
 
         logger.info(
-            "Combat initiated",
+            "Combat initiated successfully",
             extra={
-                "enemies": len(combat_enemies),
+                "enemies_count": len(combat_enemies),
                 "player_init": player_init,
                 "enemy_init": enemy_init,
+                "combat_state": session["combat_state"],
             },
         )
 
