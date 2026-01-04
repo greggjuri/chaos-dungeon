@@ -134,7 +134,7 @@ class TestBuildSystemPrompt:
         assert "dice_rolls" in prompt
 
         # Content guidelines
-        assert "mature game" in prompt.lower()
+        assert "adults only" in prompt.lower() or "adults-only" in prompt.lower()
 
 
 class TestCampaignPrompts:

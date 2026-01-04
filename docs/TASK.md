@@ -36,6 +36,7 @@
 - [x] init-06-action-handler.md - DM Lambda with Claude API, action processing, state changes
 - [x] init-07-combat-system.md - Server-side combat resolution with dice, bestiary, combat resolver
 - [x] init-08-game-ui.md - Chat interface with message history, character status, combat display
+- [x] prp-09-mistral-dm.md - Migrate DM from Claude Haiku to Mistral Small via AWS Bedrock
 
 ---
 
@@ -54,4 +55,4 @@ None currently.
 
 ---
 
-*Last updated: 2026-01-03 (init-08 game UI complete)*
+*Last updated: 2026-01-04 (prp-09 Mistral DM migration complete)*

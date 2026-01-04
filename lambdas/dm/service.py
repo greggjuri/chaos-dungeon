@@ -1,12 +1,13 @@
 """DM service for processing player actions."""
 
+import os
 from datetime import UTC, datetime
+from typing import Protocol
 from uuid import uuid4
 
 from aws_lambda_powertools import Logger
 
 from dm.bestiary import spawn_enemy
-from dm.claude_client import ClaudeClient
 from dm.combat import CombatResolver
 from dm.models import (
     ActionResponse,
@@ -25,34 +26,59 @@ from shared.db import DynamoDBClient, convert_floats_to_decimal
 from shared.dice import roll as roll_dice_notation
 from shared.exceptions import GameStateError, NotFoundError
 from shared.models import AbilityScores, Character, Item, Message, Session
-from shared.secrets import get_claude_api_key
 
 logger = Logger(child=True)
 
 MAX_MESSAGE_HISTORY = 50
 
+# Model provider: "mistral" (Bedrock) or "claude" (Anthropic API)
+MODEL_PROVIDER = os.environ.get("MODEL_PROVIDER", "mistral")
+
+
+class AIClient(Protocol):
+    """Protocol for AI client interface (Claude or Bedrock)."""
+
+    def send_action(
+        self,
+        system_prompt: str,
+        context: str,
+        action: str,
+    ) -> str:
+        """Send player action and return response text."""
+        ...
+
 
 class DMService:
-    """Service for processing player actions through Claude."""
+    """Service for processing player actions through AI (Claude or Mistral)."""
 
-    def __init__(self, db: DynamoDBClient, claude_client: ClaudeClient | None = None):
+    def __init__(self, db: DynamoDBClient, ai_client: AIClient | None = None):
         """Initialize DM service.
 
         Args:
             db: DynamoDB client for game state
-            claude_client: Optional pre-configured Claude client (for testing)
+            ai_client: Optional pre-configured AI client (for testing)
         """
         self.db = db
-        self.claude_client = claude_client
+        self._ai_client = ai_client
         self.prompt_builder = DMPromptBuilder()
         self.combat_resolver = CombatResolver()
 
-    def _get_claude_client(self) -> ClaudeClient:
-        """Lazy initialization of Claude client."""
-        if self.claude_client is None:
-            api_key = get_claude_api_key()
-            self.claude_client = ClaudeClient(api_key)
-        return self.claude_client
+    def _get_ai_client(self) -> AIClient:
+        """Lazy initialization of AI client based on MODEL_PROVIDER."""
+        if self._ai_client is None:
+            if MODEL_PROVIDER == "mistral":
+                from dm.bedrock_client import BedrockClient
+
+                self._ai_client = BedrockClient()
+                logger.info("Using Mistral via Bedrock")
+            else:
+                from dm.claude_client import ClaudeClient
+                from shared.secrets import get_claude_api_key
+
+                api_key = get_claude_api_key()
+                self._ai_client = ClaudeClient(api_key)
+                logger.info("Using Claude via Anthropic API")
+        return self._ai_client
 
     def process_action(
         self,
@@ -186,7 +212,7 @@ class DMService:
         # Get narrative from Claude
         campaign = session.get("campaign_setting", "default")
         system_prompt = self.prompt_builder.build_system_prompt(campaign)
-        client = self._get_claude_client()
+        client = self._get_ai_client()
         raw_response = client.send_action(system_prompt, outcome_prompt, action)
 
         # Parse response (only for narrative, state is from combat)
@@ -315,7 +341,7 @@ class DMService:
         context = self.prompt_builder.build_context(char_model, sess_model)
 
         # Call Claude
-        client = self._get_claude_client()
+        client = self._get_ai_client()
         raw_response = client.send_action(system_prompt, context, action)
 
         # Parse response

@@ -227,6 +227,47 @@ A chill runs down your spine.
         assert "ancient tome" in result.narrative
         assert "Beware the shadow" in result.narrative
 
+    def test_parse_raw_json_without_code_block(self) -> None:
+        """Test parsing raw JSON without code block markers (Mistral format)."""
+        response = """The tavern is crowded with merchants and travelers.
+
+{"state_changes": {"gold_delta": -5, "location": "The Rusty Tankard"}, "combat_active": false}"""
+
+        result = parse_dm_response(response)
+
+        assert "tavern is crowded" in result.narrative
+        assert result.state_changes.gold_delta == -5
+        assert result.state_changes.location == "The Rusty Tankard"
+        assert result.combat_active is False
+
+    def test_parse_raw_json_with_enemies(self) -> None:
+        """Test parsing raw JSON with enemies (Mistral format)."""
+        response = """A goblin leaps from the shadows!
+
+{"state_changes": {}, "combat_active": true, "enemies": [{"name": "Goblin Scout", "hp": 5, "ac": 12}]}"""
+
+        result = parse_dm_response(response)
+
+        assert "goblin leaps" in result.narrative
+        assert result.combat_active is True
+        assert len(result.enemies) == 1
+        assert result.enemies[0].name == "Goblin Scout"
+
+    def test_prefers_code_block_over_raw_json(self) -> None:
+        """Test that code blocks are preferred over raw JSON."""
+        response = """Some narrative.
+
+```json
+{"state_changes": {"hp_delta": 10}}
+```
+
+Some text with {"state_changes": {"hp_delta": -5}} raw json"""
+
+        result = parse_dm_response(response)
+
+        # Should use the code block JSON, not the raw JSON
+        assert result.state_changes.hp_delta == 10
+
 
 class TestStateChangesModel:
     """Tests for StateChanges model."""

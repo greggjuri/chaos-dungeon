@@ -14,16 +14,22 @@ logger = Logger(child=True)
 # Pattern to find JSON code blocks in the response
 JSON_BLOCK_PATTERN = re.compile(r"```json\s*\n(.*?)\n```", re.DOTALL)
 
+# Pattern to find raw JSON objects (Mistral may not use code blocks)
+RAW_JSON_PATTERN = re.compile(r"\{[\s\S]*\"state_changes\"[\s\S]*\}", re.DOTALL)
+
 
 def parse_dm_response(response_text: str) -> DMResponse:
-    """Parse Claude's response into structured data.
+    """Parse AI response into structured data.
 
     Extracts the narrative portion and any JSON state changes
-    from the DM's response. If JSON parsing fails, returns
-    the narrative only with empty state changes.
+    from the DM's response. Handles both Claude and Mistral formats:
+    - Code blocks with ```json
+    - Raw JSON objects
+
+    If JSON parsing fails, returns the narrative only with empty state changes.
 
     Args:
-        response_text: Raw response text from Claude
+        response_text: Raw response text from AI model
 
     Returns:
         Parsed DMResponse with narrative and state changes
@@ -31,7 +37,7 @@ def parse_dm_response(response_text: str) -> DMResponse:
     if not response_text or not response_text.strip():
         return DMResponse(narrative="")
 
-    # Find JSON block in response
+    # First, try to find JSON in code blocks (preferred format)
     match = JSON_BLOCK_PATTERN.search(response_text)
 
     if match:
@@ -43,11 +49,26 @@ def parse_dm_response(response_text: str) -> DMResponse:
             data = json.loads(json_str)
             return _build_response(narrative, data)
         except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse JSON from DM response: {e}")
+            logger.warning(f"Failed to parse JSON from code block: {e}")
         except ValidationError as e:
             logger.warning(f"Failed to validate DM response data: {e}")
 
+    # Try raw JSON (Mistral may not use code blocks)
+    raw_match = RAW_JSON_PATTERN.search(response_text)
+    if raw_match:
+        narrative = response_text[: raw_match.start()].strip()
+        json_str = raw_match.group()
+
+        try:
+            data = json.loads(json_str)
+            return _build_response(narrative, data)
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse raw JSON from DM response: {e}")
+        except ValidationError as e:
+            logger.warning(f"Failed to validate raw JSON data: {e}")
+
     # Fallback: return narrative only with empty state changes
+    logger.debug("No JSON found in response, using narrative only")
     return DMResponse(narrative=response_text.strip())
 
 

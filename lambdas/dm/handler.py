@@ -2,7 +2,6 @@
 
 from typing import Any
 
-import anthropic
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler import (
     APIGatewayRestResolver,
@@ -17,6 +16,7 @@ from aws_lambda_powertools.event_handler.exceptions import (
     NotFoundError as APINotFoundError,
 )
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from botocore.exceptions import ClientError
 from pydantic import ValidationError
 
 from dm.models import ActionRequest
@@ -25,6 +25,14 @@ from shared.config import get_config
 from shared.db import DynamoDBClient
 from shared.exceptions import GameStateError, NotFoundError
 from shared.utils import extract_user_id
+
+# Import anthropic for error handling (only if using Claude)
+try:
+    import anthropic
+
+    HAS_ANTHROPIC = True
+except ImportError:
+    HAS_ANTHROPIC = False
 
 logger = Logger()
 tracer = Tracer()
@@ -93,27 +101,56 @@ def post_action(session_id: str) -> Response:
         raise APINotFoundError(f"{e.resource_type.title()} not found") from None
     except GameStateError as e:
         raise BadRequestError(str(e)) from None
-    except anthropic.RateLimitError:
-        logger.warning("Claude API rate limit exceeded")
-        return Response(
-            status_code=429,
-            content_type="application/json",
-            body='{"error": "Rate limit exceeded. Please try again later."}',
-        )
-    except anthropic.APIConnectionError as e:
-        logger.error(f"Claude API connection error: {e}")
-        return Response(
-            status_code=503,
-            content_type="application/json",
-            body='{"error": "Service temporarily unavailable"}',
-        )
-    except anthropic.APIStatusError as e:
-        logger.error(f"Claude API error: {e.status_code} - {e.message}")
-        return Response(
-            status_code=500,
-            content_type="application/json",
-            body='{"error": "DM unavailable"}',
-        )
+    # Bedrock errors (Mistral)
+    except ClientError as e:
+        error_code = e.response.get("Error", {}).get("Code", "")
+        if error_code == "ThrottlingException":
+            logger.warning("Bedrock rate limit exceeded")
+            return Response(
+                status_code=429,
+                content_type="application/json",
+                body='{"error": "Rate limit exceeded. Please try again later."}',
+            )
+        elif error_code in ("ServiceUnavailableException", "ModelTimeoutException"):
+            logger.error(f"Bedrock service error: {e}")
+            return Response(
+                status_code=503,
+                content_type="application/json",
+                body='{"error": "DM temporarily unavailable"}',
+            )
+        else:
+            logger.error(f"Bedrock error: {error_code} - {e}")
+            return Response(
+                status_code=500,
+                content_type="application/json",
+                body='{"error": "DM service error"}',
+            )
+    # Anthropic errors (Claude) - only if using Claude
+    except Exception as e:
+        if HAS_ANTHROPIC:
+            if isinstance(e, anthropic.RateLimitError):
+                logger.warning("Claude API rate limit exceeded")
+                return Response(
+                    status_code=429,
+                    content_type="application/json",
+                    body='{"error": "Rate limit exceeded. Please try again later."}',
+                )
+            elif isinstance(e, anthropic.APIConnectionError):
+                logger.error(f"Claude API connection error: {e}")
+                return Response(
+                    status_code=503,
+                    content_type="application/json",
+                    body='{"error": "Service temporarily unavailable"}',
+                )
+            elif isinstance(e, anthropic.APIStatusError):
+                logger.error(f"Claude API error: {e.status_code} - {e.message}")
+                return Response(
+                    status_code=500,
+                    content_type="application/json",
+                    body='{"error": "DM unavailable"}',
+                )
+        # Re-raise unknown exceptions
+        raise
 
 
 @logger.inject_lambda_context

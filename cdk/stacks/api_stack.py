@@ -200,9 +200,12 @@ class ChaosApiStack(Stack):
                 "POWERTOOLS_LOG_LEVEL": (
                     "DEBUG" if self.deploy_env == "dev" else "INFO"
                 ),
+                # Model provider: "mistral" (Bedrock) or "claude" (Anthropic API)
+                "MODEL_PROVIDER": "mistral",
+                # Keep Claude API key for rollback capability
                 "CLAUDE_API_KEY_PARAM": "/automations/dev/secrets/anthropic_api_key",
             },
-            timeout=Duration.seconds(30),  # Claude API can be slow
+            timeout=Duration.seconds(30),  # AI API can be slow
             memory_size=256,
             tracing=lambda_.Tracing.ACTIVE,
         )
@@ -210,13 +213,25 @@ class ChaosApiStack(Stack):
         # Grant DynamoDB access
         self.base_stack.table.grant_read_write_data(function)
 
-        # Grant SSM Parameter Store access for Claude API key
+        # Grant SSM Parameter Store access for Claude API key (for rollback)
         function.add_to_role_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["ssm:GetParameter"],
                 resources=[
                     "arn:aws:ssm:us-east-1:490004610151:parameter/automations/dev/secrets/anthropic_api_key"
+                ],
+            )
+        )
+
+        # Grant Bedrock model invocation for Mistral
+        function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["bedrock:InvokeModel"],
+                resources=[
+                    # Mistral Small in us-east-1
+                    "arn:aws:bedrock:us-east-1::foundation-model/mistral.mistral-small-2402-v1:0"
                 ],
             )
         )

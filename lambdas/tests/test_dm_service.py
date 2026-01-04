@@ -459,28 +459,39 @@ class TestProcessAction:
         assert "SESS#" in sess_call.args[1]
 
 
-class TestGetClaudeClient:
-    """Tests for lazy Claude client initialization."""
+class TestGetAIClient:
+    """Tests for lazy AI client initialization."""
 
-    def test_lazy_init_creates_client(self, mock_db):
-        """_get_claude_client should create client on first call."""
-        service = DMService(mock_db)  # No claude_client provided
+    def test_lazy_init_creates_mistral_client(self, mock_db):
+        """_get_ai_client should create Bedrock client when MODEL_PROVIDER is mistral."""
+        service = DMService(mock_db)  # No ai_client provided
 
-        with patch("dm.service.get_claude_api_key", return_value="test-key"):
-            with patch("dm.service.ClaudeClient") as mock_client_class:
-                client = service._get_claude_client()
+        with patch("dm.service.MODEL_PROVIDER", "mistral"):
+            with patch("dm.bedrock_client.boto3") as mock_boto3:
+                client = service._get_ai_client()
 
-                mock_client_class.assert_called_once_with("test-key")
-                assert client == mock_client_class.return_value
+                mock_boto3.client.assert_called_once()
+                assert client is not None
+
+    def test_lazy_init_creates_claude_client(self, mock_db):
+        """_get_ai_client should create Claude client when MODEL_PROVIDER is claude."""
+        service = DMService(mock_db)  # No ai_client provided
+
+        with patch("dm.service.MODEL_PROVIDER", "claude"):
+            with patch("shared.secrets.get_claude_api_key", return_value="test-key"):
+                with patch("dm.claude_client.anthropic.Anthropic") as mock_anthropic:
+                    client = service._get_ai_client()
+
+                    mock_anthropic.assert_called_once_with(api_key="test-key")
+                    assert client is not None
 
     def test_lazy_init_reuses_client(self, mock_db):
-        """_get_claude_client should reuse client on subsequent calls."""
+        """_get_ai_client should reuse client on subsequent calls."""
         service = DMService(mock_db)
 
-        with patch("dm.service.get_claude_api_key", return_value="test-key"):
-            with patch("dm.service.ClaudeClient") as mock_client_class:
-                client1 = service._get_claude_client()
-                client2 = service._get_claude_client()
+        with patch("dm.service.MODEL_PROVIDER", "mistral"):
+            with patch("dm.bedrock_client.boto3"):
+                client1 = service._get_ai_client()
+                client2 = service._get_ai_client()
 
-                mock_client_class.assert_called_once()  # Only once
                 assert client1 is client2

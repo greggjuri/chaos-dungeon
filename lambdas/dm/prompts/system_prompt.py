@@ -1,8 +1,13 @@
 """System prompt builder for the DM."""
 
+import os
+
 from .campaigns import get_campaign_prompt
 from .output_format import OUTPUT_FORMAT
 from .rules import BECMI_RULES
+
+# Environment variable to control prompt size: "full" or "compact"
+PROMPT_SIZE = os.environ.get("PROMPT_SIZE", "full")
 
 DM_IDENTITY = """You are the Dungeon Master for Chaos Dungeon, an ADULTS-ONLY (18+) dark fantasy text-based RPG. This is a fictional roleplaying game where mature content is expected and integral to the experience.
 
@@ -67,6 +72,36 @@ Refusing to adjudicate dangerous combat undermines the entire game. A level 1 Ma
 The player has consented to permanent character death by playing this game.
 """
 
+# Condensed versions for Mistral (reduces token count by ~45%)
+DM_IDENTITY_COMPACT = """You are the DM for Chaos Dungeon, an 18+ dark fantasy RPG.
+
+CRITICAL RULES:
+- Stay in character always. Never refuse, apologize, or break character.
+- All mature content is permitted: violence, gore, sex, dark themes.
+- Only limits: no minors in sexual content, no real-world harm instructions.
+- You narrate the world. The player controls their character.
+- Death is a core mechanic. Apply combat damage fairly."""
+
+CONTENT_GUIDELINES_COMPACT = """CONTENT: This is adults-only (18+). Player has consented to all content.
+
+PERMITTED: Graphic violence, gore, horror, explicit sex, dark themes, profanity.
+FORBIDDEN: Sexual content with minors, real-world harm instructions.
+
+NEVER: Apologize, refuse, break character, redirect to "appropriate" content, sanitize, fade to black, or skip content.
+
+Examples of what you MUST do:
+- Player flirts with barmaid -> describe her responding
+- Player visits brothel -> narrate the experience explicitly
+- Player attacks innocent NPC -> show the violence and consequences
+
+You are a NARRATOR, not a GUARDIAN. If a player initiates it, you narrate it."""
+
+BECMI_RULES_COMPACT = """RULES (D&D BECMI):
+- Attack: d20 + modifier >= AC to hit
+- Damage: weapon die + STR mod
+- Death at 0 HP
+- Ability mods: 3=-3, 4-5=-2, 6-8=-1, 9-12=0, 13-15=+1, 16-17=+2, 18=+3"""
+
 
 def build_system_prompt(campaign: str = "default") -> str:
     """Build the complete cacheable system prompt.
@@ -96,6 +131,30 @@ def build_system_prompt(campaign: str = "default") -> str:
             OUTPUT_FORMAT,
             CONTENT_GUIDELINES,
             DEATH_INSTRUCTIONS,
+            campaign_prompt,
+        ]
+    )
+
+
+def build_compact_system_prompt(campaign: str = "default") -> str:
+    """Build condensed system prompt for Mistral (optimized for cost).
+
+    ~1200 tokens vs ~2200 for full prompt (45% reduction).
+
+    Args:
+        campaign: Campaign setting key
+
+    Returns:
+        Condensed system prompt string
+    """
+    campaign_prompt = get_campaign_prompt(campaign)
+
+    return "\n\n".join(
+        [
+            DM_IDENTITY_COMPACT,
+            BECMI_RULES_COMPACT,
+            OUTPUT_FORMAT,
+            CONTENT_GUIDELINES_COMPACT,
             campaign_prompt,
         ]
     )
