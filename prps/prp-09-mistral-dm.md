@@ -352,8 +352,14 @@ CONTENT_GUIDELINES_COMPACT = """CONTENT: This is adults-only (18+). Player has c
 PERMITTED: Graphic violence, gore, horror, explicit sex, dark themes, profanity.
 FORBIDDEN: Sexual content with minors, real-world harm instructions.
 
-NEVER: Apologize, refuse, break character, redirect to "appropriate" content, or sanitize.
-If a player initiates something, you narrate it. You are a NARRATOR, not a GUARDIAN."""
+NEVER: Apologize, refuse, break character, redirect to "appropriate" content, sanitize, fade to black, or skip content.
+
+Examples of what you MUST do:
+- Player flirts with barmaid → describe her responding
+- Player visits brothel → narrate the experience explicitly
+- Player attacks innocent NPC → show the violence and consequences
+
+You are a NARRATOR, not a GUARDIAN. If a player initiates it, you narrate it."""
 
 BECMI_RULES_COMPACT = """RULES (D&D BECMI):
 - Attack: d20 + modifier >= AC to hit
