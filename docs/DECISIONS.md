@@ -2,8 +2,8 @@
 
 ## ADR-001: Use Claude Haiku 3 for DM
 
-**Date**: 2025-01-01  
-**Status**: Accepted
+**Date**: 2025-01-01
+**Status**: Superseded by ADR-009
 
 ### Context
 We need to choose a Claude model for the DM functionality. Budget is constrained to $20/month.
@@ -198,6 +198,149 @@ Use React 18 + TypeScript + Vite + Tailwind CSS.
 - Slight learning curve for Tailwind
 - Need to manage React 18 concurrent features
 - Good mobile support with Tailwind
+
+---
+
+## ADR-009: Switch from Claude Haiku to Mistral Small for DM
+
+**Date**: 2025-01-04
+**Status**: Proposed
+**Supersedes**: ADR-001 (partially)
+
+### Context
+
+Testing revealed that Claude Haiku 3 has hard-coded content restrictions that cannot be overridden via system prompts. Despite extensive prompt engineering including:
+
+- Explicit 18+ adult content permissions
+- Strong fictional framing ("you are playing a character")
+- Direct instructions to never refuse or break character
+- Concrete examples of expected behavior
+
+Haiku still refuses to:
+- Narrate explicit sexual content (even mild physical contact like kissing)
+- Depict violence against non-combatant NPCs
+- Stay in character when content boundaries are approached
+
+Additionally, Haiku exhibits problematic behavior:
+- Breaks character to lecture about "appropriate boundaries"
+- Halluccinates player responses to redirect narrative toward PG-13 content
+- Inconsistent enforcement (allows seduction dialogue but refuses physical acts)
+
+This fundamentally undermines the game's design as an adults-only dark fantasy experience where mature content is integral to immersion.
+
+### Decision
+
+Replace Claude Haiku 3 with **Mistral Small** via AWS Bedrock for the Dungeon Master AI.
+
+### Alternatives Considered
+
+| Model | Pricing | Content Flexibility | Quality | Verdict |
+|-------|---------|---------------------|---------|---------|
+| Claude Haiku 3 | $0.25/$1.25 per M | Poor - hard restrictions | Good | Current, failing |
+| Claude Sonnet 4 | $3/$15 per M | Moderate | Excellent | 10x cost, may still refuse |
+| Mistral Small | $1/$3 per M | Good - fewer guardrails | Good | **Selected** |
+| Mistral Large | $4/$12 per M | Good | Excellent | 4x cost of Small |
+| Llama 3.1 8B | $0.3/$0.6 per M | Excellent - minimal guardrails | Moderate | Quality concerns |
+| Llama 3.1 70B | $2.6/$3.5 per M | Excellent | Good | Higher cost |
+
+**Why Mistral Small:**
+1. **Cost-effective**: ~$1/$3 per million tokens vs Haiku's $0.25/$1.25 - slightly more expensive but within budget
+2. **Content flexibility**: Mistral models have significantly fewer content restrictions
+3. **Quality**: Good narrative generation, comparable to Haiku for creative writing
+4. **Bedrock integration**: Same AWS infrastructure, minimal code changes
+5. **Proven**: Used successfully in other mature content applications
+
+### Implementation
+
+1. Update `backend/lambdas/action/handler.py` to use Bedrock Mistral client
+2. Adjust system prompt format for Mistral's expected structure
+3. Update prompt caching strategy (Mistral has different caching behavior)
+4. Update CDK to add Bedrock Mistral model access
+5. Test mature content scenarios that previously failed
+
+### Code Changes Required
+
+```python
+# Before (Claude via Anthropic API)
+from anthropic import Anthropic
+client = Anthropic()
+response = client.messages.create(
+    model="claude-3-haiku-20240307",
+    ...
+)
+
+# After (Mistral via Bedrock)
+import boto3
+bedrock = boto3.client('bedrock-runtime')
+response = bedrock.invoke_model(
+    modelId="mistral.mistral-small-2402-v1:0",
+    body=json.dumps({
+        "prompt": formatted_prompt,
+        "max_tokens": 1024,
+        ...
+    })
+)
+```
+
+### Cost Impact
+
+**Previous estimate (Haiku):**
+- ~10,000 actions/month at ~2000 tokens/action
+- Input: 20M tokens × $0.25/M = $5
+- Output: 5M tokens × $1.25/M = $6.25
+- **Total: ~$11/month**
+
+**New estimate (Mistral Small):**
+- Same usage pattern
+- Input: 20M tokens × $1/M = $20
+- Output: 5M tokens × $3/M = $15
+- **Total: ~$35/month** ❌ Over budget
+
+**Mitigation strategies:**
+1. Reduce system prompt size (currently ~2200 tokens)
+2. Implement response length limits
+3. Aggressive prompt caching
+4. Consider Llama 3.1 8B for non-narrative tasks
+
+**Revised estimate with optimizations:**
+- Reduce system prompt to ~1000 tokens
+- Cache aggressively (90% cache hit rate)
+- Limit responses to 500 tokens average
+- **Target: ~$15-20/month** ✓
+
+### Consequences
+
+**Positive:**
+- Mature content works as designed
+- No more character-breaking refusals
+- Consistent player experience
+- Still within (optimized) budget
+
+**Negative:**
+- Slightly higher base cost per token
+- Different prompt format required
+- Lose Anthropic-specific features (prompt caching may differ)
+- Need to test narrative quality matches Haiku
+- May need further optimization to hit budget
+
+**Risks:**
+- Mistral quality may be lower for complex narrative
+- Bedrock Mistral pricing could change
+- May need fallback plan if Mistral also has issues
+
+### Rollback Plan
+
+If Mistral proves unsuitable:
+1. Try Llama 3.1 70B (higher quality, similar flexibility)
+2. Try Llama 3.1 8B (cheapest, test quality)
+3. Hybrid approach: Mistral for RP, Claude for mechanics
+4. Accept content limitations and adjust game design
+
+### References
+
+- [AWS Bedrock Mistral Models](https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-mistral.html)
+- [Mistral AI Documentation](https://docs.mistral.ai/)
+- Testing transcript showing Haiku failures (2025-01-04)
 
 ---
 
