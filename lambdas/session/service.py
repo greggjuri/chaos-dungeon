@@ -10,7 +10,7 @@ from shared.utils import generate_id, utc_now
 
 logger = Logger()
 
-MAX_SESSIONS_PER_USER = 10
+MAX_SESSIONS_PER_USER = 15
 MAX_MESSAGES_PER_SESSION = 50
 
 
