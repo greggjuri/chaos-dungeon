@@ -104,6 +104,26 @@ class ChaosHostingStack(Stack):
             protocol_policy=cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
         )
 
+        # CloudFront Function to strip /api prefix before forwarding to API Gateway
+        # Converts /api/characters -> /characters (origin_path adds /{stage})
+        strip_api_prefix = cloudfront.Function(
+            self,
+            "StripApiPrefix",
+            function_name=f"{self.prefix}-strip-api-prefix",
+            code=cloudfront.FunctionCode.from_inline(
+                """
+function handler(event) {
+    var request = event.request;
+    request.uri = request.uri.replace(/^\\/api/, '');
+    if (request.uri === '') {
+        request.uri = '/';
+    }
+    return request;
+}
+"""
+            ),
+        )
+
         # Origin request policy for API (forward headers to origin)
         api_origin_request_policy = cloudfront.OriginRequestPolicy(
             self,
@@ -134,6 +154,12 @@ class ChaosHostingStack(Stack):
                     cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
                     cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
                     origin_request_policy=api_origin_request_policy,
+                    function_associations=[
+                        cloudfront.FunctionAssociation(
+                            function=strip_api_prefix,
+                            event_type=cloudfront.FunctionEventType.VIEWER_REQUEST,
+                        )
+                    ],
                 ),
             },
             domain_names=[self.DOMAIN_NAME],
