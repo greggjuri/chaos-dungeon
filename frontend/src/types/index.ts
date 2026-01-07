@@ -194,6 +194,14 @@ export interface CharacterSnapshot {
   inventory: string[];
 }
 
+/** Token usage statistics for cost monitoring */
+export interface UsageStats {
+  session_tokens: number;
+  session_limit: number;
+  global_tokens: number;
+  global_limit: number;
+}
+
 /** Full action response from server */
 export interface FullActionResponse {
   narrative: string;
@@ -204,6 +212,7 @@ export interface FullActionResponse {
   character: CharacterSnapshot;
   character_dead: boolean;
   session_ended: boolean;
+  usage?: UsageStats;
 }
 
 /** Response when token limits are reached */

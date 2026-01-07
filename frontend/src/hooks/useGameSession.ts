@@ -10,8 +10,9 @@ import {
   GameMessage,
   CharacterSnapshot,
   CombatEnemy,
-  FullActionResponse,
+  UsageStats,
   ApiRequestError,
+  isLimitReached,
 } from '../types';
 
 interface GameState {
@@ -36,6 +37,8 @@ interface GameState {
   isSendingAction: boolean;
   /** Error state */
   error: string | null;
+  /** Token usage statistics (for debugging) */
+  usage: UsageStats | null;
 }
 
 interface UseGameSessionReturn extends GameState {
@@ -69,6 +72,7 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
   const [isLoading, setIsLoading] = useState(true);
   const [isSendingAction, setIsSendingAction] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usage, setUsage] = useState<UsageStats | null>(null);
 
   // Track if we're currently loading to prevent duplicate requests
   const loadingRef = useRef(false);
@@ -166,11 +170,24 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
       setMessages((prev) => [...prev, playerMessage]);
 
       try {
-        const response: FullActionResponse = await sessionService.sendAction(
+        const response = await sessionService.sendAction(
           sessionId,
           trimmedAction
         );
 
+        // Handle limit reached response (429)
+        if (isLimitReached(response)) {
+          // Add the limit message as a DM response
+          const dmMessage: GameMessage = {
+            role: 'dm',
+            content: response.message,
+            timestamp: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, dmMessage]);
+          return;
+        }
+
+        // Normal action response
         // Add DM response message
         const dmMessage: GameMessage = {
           role: 'dm',
@@ -183,6 +200,11 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
 
         // Update character snapshot
         setCharacterSnapshot(response.character);
+
+        // Update usage stats if available
+        if (response.usage) {
+          setUsage(response.usage);
+        }
 
         // Update combat state
         setCombatActive(response.combat_active);
@@ -237,6 +259,7 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
     isLoading,
     isSendingAction,
     error,
+    usage,
     sendAction,
     clearError,
     retryLoad,

@@ -19,10 +19,12 @@ from dm.models import (
     DMResponse,
     Enemy,
     StateChanges,
+    UsageStats,
 )
 from dm.parser import parse_dm_response
 from dm.prompts import DMPromptBuilder
 from dm.prompts.combat_prompt import build_combat_outcome_prompt
+from shared.cost_limits import CostLimits
 from shared.db import DynamoDBClient, convert_floats_to_decimal
 from shared.dice import roll as roll_dice_notation
 from shared.exceptions import GameStateError, NotFoundError
@@ -89,21 +91,35 @@ class DMService:
                 logger.info("Using Claude via Anthropic API")
         return self._ai_client
 
-    def _record_usage(self, session_id: str, response: MistralResponse) -> None:
-        """Record token usage from AI response.
+    def _record_usage(
+        self, session_id: str, response: MistralResponse
+    ) -> UsageStats | None:
+        """Record token usage from AI response and return stats.
 
         Args:
             session_id: Session ID for per-session tracking
             response: AI response with token counts
+
+        Returns:
+            UsageStats with current usage, or None if tracking unavailable
         """
         if self._token_tracker is None:
-            return
+            return None
 
         try:
-            self._token_tracker.increment_usage(
+            global_usage, session_usage = self._token_tracker.increment_usage(
                 session_id=session_id,
                 input_tokens=response.input_tokens,
                 output_tokens=response.output_tokens,
+            )
+            limits = CostLimits()
+            return UsageStats(
+                session_tokens=session_usage["input_tokens"]
+                + session_usage["output_tokens"],
+                session_limit=limits.SESSION_DAILY_TOKENS,
+                global_tokens=global_usage["input_tokens"]
+                + global_usage["output_tokens"],
+                global_limit=limits.GLOBAL_DAILY_TOKENS,
             )
         except Exception as e:
             # Don't fail the request if usage tracking fails
@@ -111,6 +127,7 @@ class DMService:
                 "Failed to record token usage",
                 extra={"error": str(e), "session_id": session_id},
             )
+            return None
 
     def process_action(
         self,
@@ -247,8 +264,8 @@ class DMService:
         client = self._get_ai_client()
         ai_response = client.send_action(system_prompt, outcome_prompt, action)
 
-        # Record token usage
-        self._record_usage(session_id, ai_response)
+        # Record token usage and get stats
+        usage_stats = self._record_usage(session_id, ai_response)
 
         # Parse response (only for narrative, state is from combat)
         dm_response = parse_dm_response(ai_response.text)
@@ -316,6 +333,7 @@ class DMService:
             ),
             character_dead=character_dead,
             session_ended=session_ended,
+            usage=usage_stats,
         )
 
     def _process_normal_action(
@@ -379,8 +397,8 @@ class DMService:
         client = self._get_ai_client()
         ai_response = client.send_action(system_prompt, context, action)
 
-        # Record token usage
-        self._record_usage(session_id, ai_response)
+        # Record token usage and get stats
+        usage_stats = self._record_usage(session_id, ai_response)
 
         # Parse response
         dm_response = parse_dm_response(ai_response.text)
@@ -475,6 +493,7 @@ class DMService:
             ),
             character_dead=character_dead,
             session_ended=session_ended,
+            usage=usage_stats,
         )
 
     def _initiate_combat(self, session: dict, enemies: list[Enemy]) -> None:

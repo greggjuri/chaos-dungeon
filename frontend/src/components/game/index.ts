@@ -9,3 +9,4 @@ export { CombatStatus } from './CombatStatus';
 export { DeathScreen } from './DeathScreen';
 export { DiceRoll } from './DiceRoll';
 export { StateChangeSummary } from './StateChangeSummary';
+export { TokenCounter } from './TokenCounter';

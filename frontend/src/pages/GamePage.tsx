@@ -9,6 +9,7 @@ import {
   ChatHistory,
   CombatStatus,
   DeathScreen,
+  TokenCounter,
 } from '../components/game';
 import { Button, Card, Loading } from '../components';
 
@@ -31,6 +32,7 @@ export function GamePage() {
     isLoading,
     isSendingAction,
     error,
+    usage,
     sendAction,
     retryLoad,
   } = useGameSession(sessionId || '');
@@ -113,6 +115,9 @@ export function GamePage() {
         disabled={sessionEnded || characterDead}
         isLoading={isSendingAction}
       />
+
+      {/* Token counter overlay - toggle with 'T' key */}
+      <TokenCounter usage={usage} />
     </div>
   );
 }

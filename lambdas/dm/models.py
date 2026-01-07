@@ -264,6 +264,22 @@ class CharacterSnapshot(BaseModel):
     """List of item names in inventory."""
 
 
+class UsageStats(BaseModel):
+    """Token usage statistics for cost monitoring."""
+
+    session_tokens: int
+    """Total tokens used by this session today."""
+
+    session_limit: int
+    """Session daily token limit."""
+
+    global_tokens: int
+    """Total tokens used globally today."""
+
+    global_limit: int
+    """Global daily token limit."""
+
+
 class ActionResponse(BaseModel):
     """Full response to player action."""
 
@@ -290,3 +306,6 @@ class ActionResponse(BaseModel):
 
     session_ended: bool = False
     """True if session has ended."""
+
+    usage: UsageStats | None = None
+    """Token usage statistics (for debugging/monitoring)."""
