@@ -35,14 +35,14 @@ api_stack = ChaosApiStack(
     env=env,
 )
 
-# Only create hosting stack for prod (or when explicitly enabled)
-if environment == "prod" or os.environ.get("ENABLE_HOSTING") == "true":
-    if not certificate_arn:
-        raise ValueError(
-            "certificateArn context is required for hosting stack. "
-            "Use: cdk deploy -c certificateArn=arn:aws:acm:..."
-        )
+# Only create hosting stack when certificateArn is provided
+# For prod: cdk deploy ChaosHosting-prod -c environment=prod -c certificateArn=arn:aws:acm:...
+# For dev:  ENABLE_HOSTING=true cdk deploy ChaosHosting-dev -c certificateArn=arn:aws:acm:...
+should_create_hosting = (
+    environment == "prod" or os.environ.get("ENABLE_HOSTING") == "true"
+)
 
+if should_create_hosting and certificate_arn:
     hosting_stack = ChaosHostingStack(
         app,
         f"ChaosHosting-{environment}",
@@ -50,6 +50,13 @@ if environment == "prod" or os.environ.get("ENABLE_HOSTING") == "true":
         environment=environment,
         certificate_arn=certificate_arn,
         env=env,
+    )
+elif should_create_hosting:
+    # Hosting eligible but no cert - print hint if user tries to deploy it
+    print(
+        f"Note: ChaosHosting-{environment} requires certificateArn context. "
+        "Use: cdk deploy ChaosHosting-prod -c environment=prod "
+        "-c certificateArn=arn:aws:acm:us-east-1:ACCOUNT:certificate/ID"
     )
 
 app.synth()
