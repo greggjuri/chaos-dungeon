@@ -7,6 +7,7 @@ import anthropic
 import pytest
 
 from dm.models import ActionResponse, CharacterSnapshot, DiceRoll, Enemy, StateChanges
+from shared.cost_guard import LimitStatus
 
 
 @pytest.fixture
@@ -14,6 +15,14 @@ def mock_service():
     """Create a mock DM service."""
     service = MagicMock()
     return service
+
+
+@pytest.fixture
+def mock_cost_guard():
+    """Create a mock CostGuard that allows requests."""
+    guard = MagicMock()
+    guard.check_limits.return_value = LimitStatus(allowed=True)
+    return guard
 
 
 @pytest.fixture
@@ -74,11 +83,16 @@ def make_api_event(
 class TestPostAction:
     """Tests for POST /sessions/{session_id}/action endpoint."""
 
-    def test_post_action_success(self, mock_service, mock_context, sample_action_response):
+    def test_post_action_success(
+        self, mock_service, mock_cost_guard, mock_context, sample_action_response
+    ):
         """POST action should return 200 with ActionResponse."""
         mock_service.process_action.return_value = sample_action_response
 
-        with patch("dm.handler._service", mock_service):
+        with (
+            patch("dm.handler._service", mock_service),
+            patch("dm.handler._cost_guard", mock_cost_guard),
+        ):
             from dm.handler import lambda_handler
 
             event = make_api_event(body={"action": "I attack the goblin"})
@@ -137,13 +151,16 @@ class TestPostAction:
 
         assert result["statusCode"] == 400
 
-    def test_post_action_session_not_found(self, mock_service, mock_context):
+    def test_post_action_session_not_found(self, mock_service, mock_cost_guard, mock_context):
         """POST action for nonexistent session should return 404."""
         from shared.exceptions import NotFoundError
 
         mock_service.process_action.side_effect = NotFoundError("session", "sess-123")
 
-        with patch("dm.handler._service", mock_service):
+        with (
+            patch("dm.handler._service", mock_service),
+            patch("dm.handler._cost_guard", mock_cost_guard),
+        ):
             from dm.handler import lambda_handler
 
             event = make_api_event(body={"action": "I attack"})
@@ -151,13 +168,16 @@ class TestPostAction:
 
         assert result["statusCode"] == 404
 
-    def test_post_action_character_not_found(self, mock_service, mock_context):
+    def test_post_action_character_not_found(self, mock_service, mock_cost_guard, mock_context):
         """POST action when character is deleted should return 404."""
         from shared.exceptions import NotFoundError
 
         mock_service.process_action.side_effect = NotFoundError("character", "char-123")
 
-        with patch("dm.handler._service", mock_service):
+        with (
+            patch("dm.handler._service", mock_service),
+            patch("dm.handler._cost_guard", mock_cost_guard),
+        ):
             from dm.handler import lambda_handler
 
             event = make_api_event(body={"action": "I attack"})
@@ -165,7 +185,7 @@ class TestPostAction:
 
         assert result["statusCode"] == 404
 
-    def test_post_action_session_ended(self, mock_service, mock_context):
+    def test_post_action_session_ended(self, mock_service, mock_cost_guard, mock_context):
         """POST action for ended session should return 400."""
         from shared.exceptions import GameStateError
 
@@ -173,7 +193,10 @@ class TestPostAction:
             "Session has ended", current_state="character_death"
         )
 
-        with patch("dm.handler._service", mock_service):
+        with (
+            patch("dm.handler._service", mock_service),
+            patch("dm.handler._cost_guard", mock_cost_guard),
+        ):
             from dm.handler import lambda_handler
 
             event = make_api_event(body={"action": "I attack"})
@@ -181,7 +204,7 @@ class TestPostAction:
 
         assert result["statusCode"] == 400
 
-    def test_post_action_rate_limit_error(self, mock_service, mock_context):
+    def test_post_action_rate_limit_error(self, mock_service, mock_cost_guard, mock_context):
         """POST action hitting rate limit should return 429."""
         mock_service.process_action.side_effect = anthropic.RateLimitError(
             message="Rate limit exceeded",
@@ -189,7 +212,10 @@ class TestPostAction:
             body={"error": {"message": "Rate limit exceeded"}},
         )
 
-        with patch("dm.handler._service", mock_service):
+        with (
+            patch("dm.handler._service", mock_service),
+            patch("dm.handler._cost_guard", mock_cost_guard),
+        ):
             from dm.handler import lambda_handler
 
             event = make_api_event(body={"action": "I attack"})
@@ -199,7 +225,7 @@ class TestPostAction:
         body = json.loads(result["body"])
         assert "rate limit" in body["error"].lower()
 
-    def test_post_action_connection_error(self, mock_service, mock_context):
+    def test_post_action_connection_error(self, mock_service, mock_cost_guard, mock_context):
         """POST action with connection error should return 503."""
         mock_request = MagicMock()
         mock_service.process_action.side_effect = anthropic.APIConnectionError(
@@ -207,7 +233,10 @@ class TestPostAction:
             request=mock_request,
         )
 
-        with patch("dm.handler._service", mock_service):
+        with (
+            patch("dm.handler._service", mock_service),
+            patch("dm.handler._cost_guard", mock_cost_guard),
+        ):
             from dm.handler import lambda_handler
 
             event = make_api_event(body={"action": "I attack"})
@@ -217,7 +246,7 @@ class TestPostAction:
         body = json.loads(result["body"])
         assert "unavailable" in body["error"].lower()
 
-    def test_post_action_api_status_error(self, mock_service, mock_context):
+    def test_post_action_api_status_error(self, mock_service, mock_cost_guard, mock_context):
         """POST action with API error should return 500."""
         mock_service.process_action.side_effect = anthropic.APIStatusError(
             message="API Error",
@@ -225,7 +254,10 @@ class TestPostAction:
             body={"error": {"message": "Internal error"}},
         )
 
-        with patch("dm.handler._service", mock_service):
+        with (
+            patch("dm.handler._service", mock_service),
+            patch("dm.handler._cost_guard", mock_cost_guard),
+        ):
             from dm.handler import lambda_handler
 
             event = make_api_event(body={"action": "I attack"})

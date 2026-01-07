@@ -1,7 +1,7 @@
 /**
  * Session API service.
  */
-import { request } from './api';
+import { request, getUserId } from './api';
 import {
   Session,
   SessionListResponse,
@@ -9,7 +9,11 @@ import {
   SessionCreateResponse,
   MessageHistoryResponse,
   FullActionResponse,
+  LimitReachedResponse,
+  ApiRequestError,
 } from '../types';
+
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 export const sessionService = {
   /**
@@ -51,10 +55,35 @@ export const sessionService = {
 
   /**
    * Send a player action to the DM.
+   * Returns LimitReachedResponse if token limits are hit (429).
    */
-  sendAction: (sessionId: string, action: string) =>
-    request<FullActionResponse>(`/sessions/${sessionId}/action`, {
+  sendAction: async (
+    sessionId: string,
+    action: string
+  ): Promise<FullActionResponse | LimitReachedResponse> => {
+    const userId = getUserId();
+
+    const response = await fetch(`${API_BASE}/sessions/${sessionId}/action`, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Id': userId,
+      },
       body: JSON.stringify({ action }),
-    }),
+    });
+
+    // Handle 429 as a valid response (has narrative message)
+    if (response.status === 429) {
+      return response.json() as Promise<LimitReachedResponse>;
+    }
+
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ error: 'Unknown error' }));
+      throw new ApiRequestError(response.status, error.error, error.details);
+    }
+
+    return response.json() as Promise<FullActionResponse>;
+  },
 };

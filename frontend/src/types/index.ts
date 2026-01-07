@@ -206,6 +206,23 @@ export interface FullActionResponse {
   session_ended: boolean;
 }
 
+/** Response when token limits are reached */
+export interface LimitReachedResponse {
+  error: 'limit_reached';
+  message: string;
+}
+
+/** Type guard for limit reached responses */
+export function isLimitReached(
+  response: FullActionResponse | LimitReachedResponse
+): response is LimitReachedResponse {
+  return (
+    'error' in response &&
+    response.error === 'limit_reached' &&
+    'message' in response
+  );
+}
+
 /** Extended message for game UI (includes dice rolls and state changes) */
 export interface GameMessage extends Message {
   dice_rolls?: DiceRoll[];

@@ -1,8 +1,9 @@
 """DM Lambda handler for processing player actions."""
 
+import json
 from typing import Any
 
-from aws_lambda_powertools import Logger, Tracer
+from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
     APIGatewayRestResolver,
     CORSConfig,
@@ -15,6 +16,7 @@ from aws_lambda_powertools.event_handler.exceptions import (
 from aws_lambda_powertools.event_handler.exceptions import (
     NotFoundError as APINotFoundError,
 )
+from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 from pydantic import ValidationError
@@ -22,8 +24,10 @@ from pydantic import ValidationError
 from dm.models import ActionRequest
 from dm.service import DMService
 from shared.config import get_config
+from shared.cost_guard import CostGuard, get_limit_message
 from shared.db import DynamoDBClient
 from shared.exceptions import GameStateError, NotFoundError
+from shared.token_tracker import TokenTracker
 from shared.utils import extract_user_id
 
 # Import anthropic for error handling (only if using Claude)
@@ -36,6 +40,7 @@ except ImportError:
 
 logger = Logger()
 tracer = Tracer()
+metrics = Metrics(namespace="ChaosDungeon")
 
 config = get_config()
 cors_config = CORSConfig(
@@ -45,6 +50,16 @@ cors_config = CORSConfig(
 app = APIGatewayRestResolver(cors=cors_config)
 
 _service: DMService | None = None
+_cost_guard: CostGuard | None = None
+
+
+def get_cost_guard() -> CostGuard:
+    """Get or create the CostGuard singleton."""
+    global _cost_guard
+    if _cost_guard is None:
+        tracker = TokenTracker(config.table_name)
+        _cost_guard = CostGuard(tracker)
+    return _cost_guard
 
 
 def get_service() -> DMService:
@@ -52,7 +67,8 @@ def get_service() -> DMService:
     global _service
     if _service is None:
         db = DynamoDBClient(config.table_name)
-        _service = DMService(db)
+        tracker = TokenTracker(config.table_name)
+        _service = DMService(db, token_tracker=tracker)
     return _service
 
 
@@ -83,6 +99,31 @@ def post_action(session_id: str) -> Response:
     except ValidationError as e:
         error_msg = e.errors()[0].get("msg", "Invalid request")
         raise BadRequestError(error_msg) from None
+
+    # Check cost limits before AI call
+    cost_guard = get_cost_guard()
+    limit_status = cost_guard.check_limits(session_id)
+
+    if not limit_status.allowed:
+        logger.info(
+            "Request blocked by cost limits",
+            extra={
+                "session_id": session_id,
+                "reason": limit_status.reason,
+                "global_usage": limit_status.global_usage,
+                "session_usage": limit_status.session_usage,
+            },
+        )
+        metrics.add_metric(name="LimitHits", unit=MetricUnit.Count, value=1)
+        metrics.add_dimension(name="Reason", value=limit_status.reason or "unknown")
+        return Response(
+            status_code=429,
+            content_type="application/json",
+            body=json.dumps({
+                "error": "limit_reached",
+                "message": get_limit_message(limit_status.reason or ""),
+            }),
+        )
 
     service = get_service()
 
@@ -155,6 +196,7 @@ def post_action(session_id: str) -> Response:
 
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
+@metrics.log_metrics
 def lambda_handler(event: dict[str, Any], context: LambdaContext) -> dict[str, Any]:
     """Main Lambda entry point."""
     return app.resolve(event, context)

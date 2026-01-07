@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from aws_lambda_powertools import Logger
 
+from dm.bedrock_client import MistralResponse
 from dm.bestiary import spawn_enemy
 from dm.combat import CombatResolver
 from dm.models import (
@@ -26,6 +27,7 @@ from shared.db import DynamoDBClient, convert_floats_to_decimal
 from shared.dice import roll as roll_dice_notation
 from shared.exceptions import GameStateError, NotFoundError
 from shared.models import AbilityScores, Character, Item, Message, Session
+from shared.token_tracker import TokenTracker
 
 logger = Logger(child=True)
 
@@ -43,23 +45,30 @@ class AIClient(Protocol):
         system_prompt: str,
         context: str,
         action: str,
-    ) -> str:
-        """Send player action and return response text."""
+    ) -> MistralResponse:
+        """Send player action and return response with usage stats."""
         ...
 
 
 class DMService:
     """Service for processing player actions through AI (Claude or Mistral)."""
 
-    def __init__(self, db: DynamoDBClient, ai_client: AIClient | None = None):
+    def __init__(
+        self,
+        db: DynamoDBClient,
+        ai_client: AIClient | None = None,
+        token_tracker: TokenTracker | None = None,
+    ):
         """Initialize DM service.
 
         Args:
             db: DynamoDB client for game state
             ai_client: Optional pre-configured AI client (for testing)
+            token_tracker: Optional token tracker for usage recording
         """
         self.db = db
         self._ai_client = ai_client
+        self._token_tracker = token_tracker
         self.prompt_builder = DMPromptBuilder()
         self.combat_resolver = CombatResolver()
 
@@ -79,6 +88,29 @@ class DMService:
                 self._ai_client = ClaudeClient(api_key)
                 logger.info("Using Claude via Anthropic API")
         return self._ai_client
+
+    def _record_usage(self, session_id: str, response: MistralResponse) -> None:
+        """Record token usage from AI response.
+
+        Args:
+            session_id: Session ID for per-session tracking
+            response: AI response with token counts
+        """
+        if self._token_tracker is None:
+            return
+
+        try:
+            self._token_tracker.increment_usage(
+                session_id=session_id,
+                input_tokens=response.input_tokens,
+                output_tokens=response.output_tokens,
+            )
+        except Exception as e:
+            # Don't fail the request if usage tracking fails
+            logger.warning(
+                "Failed to record token usage",
+                extra={"error": str(e), "session_id": session_id},
+            )
 
     def process_action(
         self,
@@ -213,10 +245,13 @@ class DMService:
         campaign = session.get("campaign_setting", "default")
         system_prompt = self.prompt_builder.build_system_prompt(campaign)
         client = self._get_ai_client()
-        raw_response = client.send_action(system_prompt, outcome_prompt, action)
+        ai_response = client.send_action(system_prompt, outcome_prompt, action)
+
+        # Record token usage
+        self._record_usage(session_id, ai_response)
 
         # Parse response (only for narrative, state is from combat)
-        dm_response = parse_dm_response(raw_response)
+        dm_response = parse_dm_response(ai_response.text)
 
         # Apply XP from combat
         character["xp"] += round_result.xp_gained
@@ -342,10 +377,13 @@ class DMService:
 
         # Call Claude
         client = self._get_ai_client()
-        raw_response = client.send_action(system_prompt, context, action)
+        ai_response = client.send_action(system_prompt, context, action)
+
+        # Record token usage
+        self._record_usage(session_id, ai_response)
 
         # Parse response
-        dm_response = parse_dm_response(raw_response)
+        dm_response = parse_dm_response(ai_response.text)
 
         # Debug logging for combat initiation
         logger.debug(

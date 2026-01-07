@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from botocore.exceptions import ClientError
 
-from dm.bedrock_client import MODEL_ID, BedrockClient
+from dm.bedrock_client import MODEL_ID, BedrockClient, MistralResponse
 
 
 class TestBedrockClient:
@@ -28,7 +28,10 @@ class TestBedrockClient:
         client = BedrockClient()
         result = client.invoke_mistral("Test prompt")
 
-        assert result == "The goblin attacks!"
+        assert isinstance(result, MistralResponse)
+        assert result.text == "The goblin attacks!"
+        assert result.input_tokens > 0
+        assert result.output_tokens > 0
         mock_bedrock.invoke_model.assert_called_once()
 
         # Verify model ID
@@ -98,7 +101,8 @@ class TestBedrockClient:
             action="I attack the goblin",
         )
 
-        assert result == "You attack the goblin."
+        assert isinstance(result, MistralResponse)
+        assert result.text == "You attack the goblin."
 
         # Verify prompt format
         call_kwargs = mock_bedrock.invoke_model.call_args.kwargs

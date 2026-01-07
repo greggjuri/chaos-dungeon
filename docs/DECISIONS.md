@@ -344,6 +344,77 @@ If Mistral proves unsuitable:
 
 ---
 
+## ADR-010: Application-Level Cost Protection
+
+**Date**: 2026-01-07
+**Status**: Accepted
+
+### Context
+
+AWS Budget alerts have up to 6-hour delay before triggering, which is insufficient to prevent runaway AI costs in real-time. With Mistral Small pricing ($1/$3 per 1M tokens) and a $20/month budget, a compromised session or abuse scenario could consume the entire monthly budget before AWS Budgets reacts.
+
+### Decision
+
+Implement application-level token tracking using DynamoDB atomic counters with:
+- **Global daily limit**: 500,000 tokens/day (~$1.10/day worst case)
+- **Per-session daily limit**: 50,000 tokens/session/day
+- **Pre-request limit checks** before calling Bedrock
+- **Post-response usage recording** with atomic counters
+- **In-game narrative messages** when limits are hit
+- **CloudWatch metrics** for monitoring
+
+### Implementation
+
+1. `lambdas/shared/cost_limits.py` - Configuration constants
+2. `lambdas/shared/token_tracker.py` - DynamoDB atomic counter operations
+3. `lambdas/shared/cost_guard.py` - Limit checking before AI calls
+4. DM handler checks limits before AI invocation, returns 429 with narrative
+5. DM service records usage after successful responses
+6. CloudWatch alarms for high usage (80%) and limit hits
+
+### DynamoDB Schema
+
+```
+# Global daily usage
+PK: USAGE#GLOBAL
+SK: DATE#2026-01-07
+TTL: 90 days
+
+# Per-session daily usage
+PK: SESSION#{session_id}
+SK: USAGE#DATE#2026-01-07
+TTL: 7 days
+```
+
+### Rationale
+
+- DynamoDB atomic counters are thread-safe for concurrent requests
+- Pre-request checks prevent wasted API calls
+- In-game narrative messages maintain immersion when limits hit
+- TTL enables automatic cleanup without maintenance
+- CloudWatch metrics enable cost monitoring dashboards
+
+### Consequences
+
+**Positive:**
+- Real-time budget protection (no 6-hour delay)
+- Graceful degradation with themed messages
+- Automatic daily reset at midnight UTC
+- Self-cleaning via TTL
+- Observable via CloudWatch
+
+**Negative:**
+- Slight DynamoDB latency for limit checks (~10ms)
+- Additional AWS costs (~$0.52/month)
+- Token estimation for Mistral (no exact counts from API)
+
+### References
+
+- PRP: `prps/prp-10-cost-protection.md`
+- Init spec: `initials/init-10-cost-protection.md`
+
+---
+
 ## Template for New Decisions
 
 ```markdown

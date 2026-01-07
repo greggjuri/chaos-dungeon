@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+from dm.bedrock_client import MistralResponse
+
 
 class TestClaudeClient:
     """Tests for ClaudeClient class."""
@@ -43,7 +45,10 @@ class TestClaudeClient:
                 action="I attack the goblin",
             )
 
-            assert result == "DM response text"
+            assert isinstance(result, MistralResponse)
+            assert result.text == "DM response text"
+            assert result.input_tokens == 100
+            assert result.output_tokens == 200
             mock_client.messages.create.assert_called_once()
 
             call_kwargs = mock_client.messages.create.call_args.kwargs
@@ -109,7 +114,8 @@ class TestClaudeClient:
             client = ClaudeClient("test-key")
             result = client.send_action("system", "context", "action")
 
-            assert result == "Response"
+            assert isinstance(result, MistralResponse)
+            assert result.text == "Response"
 
     def test_model_constant(self) -> None:
         """ClaudeClient should use Haiku 3 model."""

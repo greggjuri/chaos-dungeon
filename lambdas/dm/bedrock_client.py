@@ -1,6 +1,7 @@
 """Bedrock client for Mistral model invocation."""
 
 import json
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import boto3
@@ -13,6 +14,15 @@ if TYPE_CHECKING:
 logger = Logger(child=True)
 
 MODEL_ID = "mistral.mistral-small-2402-v1:0"
+
+
+@dataclass
+class MistralResponse:
+    """Response from Mistral invocation with usage stats."""
+
+    text: str
+    input_tokens: int
+    output_tokens: int
 
 
 class BedrockClient:
@@ -34,7 +44,7 @@ class BedrockClient:
         max_tokens: int = 1024,
         temperature: float = 0.8,
         top_p: float = 0.95,
-    ) -> str:
+    ) -> MistralResponse:
         """Invoke Mistral Small via Bedrock.
 
         Args:
@@ -44,7 +54,7 @@ class BedrockClient:
             top_p: Top-p sampling parameter
 
         Returns:
-            Generated text response
+            MistralResponse with text and estimated token counts
 
         Raises:
             ClientError: Bedrock API errors
@@ -71,8 +81,8 @@ class BedrockClient:
 
             # Log usage metrics (estimate tokens from response length)
             # Mistral doesn't return token counts, so we estimate
-            input_tokens = len(prompt.split()) * 1.3  # rough estimate
-            output_tokens = len(output_text.split()) * 1.3
+            input_tokens = int(len(prompt.split()) * 1.3)  # rough estimate
+            output_tokens = int(len(output_text.split()) * 1.3)
 
             # Calculate estimated cost (Mistral Small: $1/$3 per M tokens)
             estimated_cost = (input_tokens * 1.0 / 1_000_000) + (
@@ -83,13 +93,17 @@ class BedrockClient:
                 "Bedrock Mistral usage",
                 extra={
                     "model": MODEL_ID,
-                    "estimated_input_tokens": int(input_tokens),
-                    "estimated_output_tokens": int(output_tokens),
+                    "estimated_input_tokens": input_tokens,
+                    "estimated_output_tokens": output_tokens,
                     "estimated_cost_usd": round(estimated_cost, 6),
                 },
             )
 
-            return output_text
+            return MistralResponse(
+                text=output_text,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+            )
 
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "Unknown")
@@ -107,8 +121,8 @@ class BedrockClient:
         system_prompt: str,
         context: str,
         action: str,
-    ) -> str:
-        """Send player action to Mistral, return raw response text.
+    ) -> MistralResponse:
+        """Send player action to Mistral, return response with usage stats.
 
         Matches ClaudeClient interface for easy swapping.
 
@@ -118,7 +132,7 @@ class BedrockClient:
             action: Player's action text
 
         Returns:
-            Raw response text from Mistral
+            MistralResponse with text and token usage
         """
         from dm.prompts.mistral_format import build_mistral_prompt
 

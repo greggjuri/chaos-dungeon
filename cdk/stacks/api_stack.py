@@ -10,6 +10,7 @@ Contains:
 """
 from aws_cdk import CfnOutput, Duration, Stack
 from aws_cdk import aws_apigateway as apigw
+from aws_cdk import aws_cloudwatch as cloudwatch
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as lambda_
 from constructs import Construct
@@ -50,6 +51,9 @@ class ChaosApiStack(Stack):
         self.character_function = self._create_character_lambda()
         self.session_function = self._create_session_lambda()
         self.dm_function = self._create_dm_lambda()
+
+        # Create CloudWatch alarms for cost protection
+        self._create_cost_alarms()
 
         # Create API Gateway
         self.api = self._create_api()
@@ -197,6 +201,7 @@ class ChaosApiStack(Stack):
                 "TABLE_NAME": self.base_stack.table.table_name,
                 "ENVIRONMENT": self.deploy_env,
                 "POWERTOOLS_SERVICE_NAME": "dm",
+                "POWERTOOLS_METRICS_NAMESPACE": "ChaosDungeon",
                 "POWERTOOLS_LOG_LEVEL": (
                     "DEBUG" if self.deploy_env == "dev" else "INFO"
                 ),
@@ -237,6 +242,44 @@ class ChaosApiStack(Stack):
         )
 
         return function
+
+    def _create_cost_alarms(self) -> None:
+        """Create CloudWatch alarms for cost protection monitoring."""
+        # High usage alarm (80% of 500K daily limit = 400K tokens)
+        cloudwatch.Alarm(
+            self,
+            "HighTokenUsageAlarm",
+            alarm_name=f"{self.prefix}-high-token-usage",
+            metric=cloudwatch.Metric(
+                namespace="ChaosDungeon",
+                metric_name="TokensConsumed",
+                statistic="Sum",
+                period=Duration.hours(24),
+            ),
+            threshold=400_000,  # 80% of 500K daily limit
+            evaluation_periods=1,
+            alarm_description="Daily token usage approaching 80% of limit (400K/500K)",
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+
+        # Limit hit alarm - triggers when any limit is hit
+        cloudwatch.Alarm(
+            self,
+            "LimitHitAlarm",
+            alarm_name=f"{self.prefix}-limit-hit",
+            metric=cloudwatch.Metric(
+                namespace="ChaosDungeon",
+                metric_name="LimitHits",
+                statistic="Sum",
+                period=Duration.minutes(5),
+            ),
+            threshold=1,
+            evaluation_periods=1,
+            alarm_description="Token limit was hit (global or session)",
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
 
     def _create_api(self) -> apigw.RestApi:
         """Create API Gateway REST API with CORS configuration."""

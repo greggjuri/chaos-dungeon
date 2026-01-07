@@ -3,6 +3,8 @@
 import anthropic
 from aws_lambda_powertools import Logger
 
+from dm.bedrock_client import MistralResponse
+
 logger = Logger(child=True)
 
 
@@ -25,8 +27,8 @@ class ClaudeClient:
         system_prompt: str,
         context: str,
         action: str,
-    ) -> str:
-        """Send player action to Claude, return raw response text.
+    ) -> MistralResponse:
+        """Send player action to Claude, return response with usage stats.
 
         Uses prompt caching on system_prompt for cost savings.
 
@@ -36,7 +38,7 @@ class ClaudeClient:
             action: Player's action text
 
         Returns:
-            Raw response text from Claude
+            MistralResponse with text and token usage
         """
         response = self.client.messages.create(
             model=self.MODEL,
@@ -79,4 +81,8 @@ class ClaudeClient:
             },
         )
 
-        return response.content[0].text
+        return MistralResponse(
+            text=response.content[0].text,
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+        )

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from dm.bedrock_client import MistralResponse
 from dm.models import DMResponse, Enemy, StateChanges
 from dm.service import MAX_MESSAGE_HISTORY, DMService
 from shared.exceptions import GameStateError, NotFoundError
@@ -19,7 +20,7 @@ def mock_db():
 def mock_claude_client():
     """Create a mock Claude client."""
     client = MagicMock()
-    client.send_action.return_value = """You swing your sword at the goblin, hitting it squarely!
+    response_text = """You swing your sword at the goblin, hitting it squarely!
 
 ```json
 {
@@ -48,6 +49,11 @@ def mock_claude_client():
     ]
 }
 ```"""
+    client.send_action.return_value = MistralResponse(
+        text=response_text,
+        input_tokens=100,
+        output_tokens=50,
+    )
     return client
 
 
@@ -416,7 +422,7 @@ class TestProcessAction:
 
         # Mock response that deals 10 damage (more than 1 HP)
         # Use the proper JSON format that the parser expects
-        mock_claude_client.send_action.return_value = """The dragon breathes fire, engulfing you in a torrent of flames!
+        response_text = """The dragon breathes fire, engulfing you in a torrent of flames!
 
 ```json
 {
@@ -425,6 +431,11 @@ class TestProcessAction:
     }
 }
 ```"""
+        mock_claude_client.send_action.return_value = MistralResponse(
+            text=response_text,
+            input_tokens=50,
+            output_tokens=30,
+        )
 
         result = service.process_action(
             session_id="sess-123",
