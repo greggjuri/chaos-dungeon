@@ -67,8 +67,8 @@ class TestCreateSession:
     def test_create_session_limit_exceeded(self, service, mock_db):
         """Create session should raise ConflictError when limit reached."""
         mock_db.get_item.return_value = {"character_id": "char-123", "name": "Test"}
-        # Mock 10 existing sessions
-        mock_db.query_by_pk.return_value = [{"session_id": f"sess-{i}"} for i in range(10)]
+        # Mock 15 existing sessions (MAX_SESSIONS_PER_USER)
+        mock_db.query_by_pk.return_value = [{"session_id": f"sess-{i}"} for i in range(15)]
 
         request = SessionCreateRequest(
             character_id="12345678-1234-4123-a123-123456789012",

@@ -415,6 +415,56 @@ TTL: 7 days
 
 ---
 
+## ADR-011: Single Domain Architecture for Hosting
+
+**Date**: 2026-01-07
+**Status**: Accepted
+
+### Context
+
+The game needs to be deployed to production at `chaos.jurigregg.com`. Two architecture options were considered:
+
+1. **Split Domain**: Frontend at `chaos.jurigregg.com`, API at `api.chaos.jurigregg.com`
+2. **Single Domain**: Frontend at `chaos.jurigregg.com/`, API at `chaos.jurigregg.com/api/*`
+
+### Decision
+
+Use single domain architecture where CloudFront serves both frontend (from S3) and API (proxied to API Gateway) on the same domain.
+
+### Rationale
+
+- **No CORS**: Same-origin requests eliminate CORS complexity
+- **Simpler Setup**: One CloudFront distribution, one DNS record
+- **Cost Efficient**: Single distribution is cheaper than separate API Gateway custom domain
+- **Better UX**: All requests go through CloudFront edge locations
+
+### Implementation
+
+- CloudFront distribution with two origins:
+  - Default behavior (`/*`): S3 bucket for static frontend files
+  - Path pattern (`/api/*`): API Gateway origin with path rewrite
+- Route 53 A/AAAA alias records pointing to CloudFront
+- Existing wildcard certificate (`*.jurigregg.com`) for SSL/TLS
+- S3 bucket with OAC (Origin Access Control) - no public access
+
+### Consequences
+
+**Positive:**
+- Simplified frontend API calls (relative paths)
+- Single SSL certificate suffices
+- All traffic benefits from CloudFront caching/edge
+
+**Negative:**
+- API paths must be prefixed with `/api` in CloudFront (path rewrite handled)
+- Cannot independently scale frontend vs API CDN (minor concern)
+
+### References
+
+- PRP: `prps/prp-11-domain-setup.md`
+- Init spec: `initials/init-11-domain-setup.md`
+
+---
+
 ## Template for New Decisions
 
 ```markdown

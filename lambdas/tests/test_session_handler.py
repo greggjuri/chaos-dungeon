@@ -150,8 +150,8 @@ class TestCreateSession:
         """POST /sessions when limit reached should return 409."""
         character_id = create_character()
 
-        # Create 10 sessions
-        for _ in range(10):
+        # Create 15 sessions (MAX_SESSIONS_PER_USER)
+        for _ in range(15):
             event = make_event(
                 "POST",
                 "/sessions",
@@ -159,7 +159,7 @@ class TestCreateSession:
             )
             lambda_handler(event, MagicMock())
 
-        # 11th should fail
+        # 16th should fail
         event = make_event(
             "POST",
             "/sessions",

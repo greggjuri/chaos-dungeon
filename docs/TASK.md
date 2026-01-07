@@ -20,7 +20,6 @@
 - [ ] init-13-save-slots.md - Multiple characters/campaigns
 - [ ] init-14-session-resume.md - Continue saved games
 - [ ] init-15-character-sheet.md - Detailed character view
-- [ ] init-16-domain-setup.md - chaos.jurigregg.com deployment
 
 ### Completed
 - [x] Initial project planning (PLANNING.md)
@@ -37,6 +36,7 @@
 - [x] prp-10-cost-protection.md - Application-level cost protection with token limits
 - [x] Token counter UI - Debug overlay showing session/global token usage (press T to toggle)
 - [x] Increase MAX_SESSIONS_PER_USER to 15
+- [x] prp-11-domain-setup.md - S3/CloudFront/Route53 hosting infrastructure
 
 ---
 
@@ -62,4 +62,4 @@ None currently.
 
 ---
 
-*Last updated: 2026-01-07 (prp-10 cost protection, token counter UI)*
+*Last updated: 2026-01-07 (prp-11 domain setup infrastructure)*

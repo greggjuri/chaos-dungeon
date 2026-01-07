@@ -6,6 +6,7 @@ import aws_cdk as cdk
 
 from stacks.api_stack import ChaosApiStack
 from stacks.base_stack import ChaosBaseStack
+from stacks.hosting_stack import ChaosHostingStack
 
 app = cdk.App()
 
@@ -15,6 +16,9 @@ env = cdk.Environment(
 )
 
 environment = app.node.try_get_context("environment") or "dev"
+
+# Certificate ARN for wildcard cert (required for hosting stack)
+certificate_arn = app.node.try_get_context("certificateArn")
 
 base_stack = ChaosBaseStack(
     app,
@@ -30,5 +34,22 @@ api_stack = ChaosApiStack(
     base_stack=base_stack,
     env=env,
 )
+
+# Only create hosting stack for prod (or when explicitly enabled)
+if environment == "prod" or os.environ.get("ENABLE_HOSTING") == "true":
+    if not certificate_arn:
+        raise ValueError(
+            "certificateArn context is required for hosting stack. "
+            "Use: cdk deploy -c certificateArn=arn:aws:acm:..."
+        )
+
+    hosting_stack = ChaosHostingStack(
+        app,
+        f"ChaosHosting-{environment}",
+        api_stack=api_stack,
+        environment=environment,
+        certificate_arn=certificate_arn,
+        env=env,
+    )
 
 app.synth()
