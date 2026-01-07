@@ -204,8 +204,8 @@ Use React 18 + TypeScript + Vite + Tailwind CSS.
 ## ADR-009: Switch from Claude Haiku to Mistral Small for DM
 
 **Date**: 2025-01-04
-**Status**: Proposed
-**Supersedes**: ADR-001 (partially)
+**Status**: Accepted
+**Supersedes**: ADR-001
 
 ### Context
 
