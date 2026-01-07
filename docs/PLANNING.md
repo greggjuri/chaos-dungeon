@@ -32,18 +32,18 @@ A text-based RPG web game hosted at **chaos.jurigregg.com** where Claude serves 
               ┌───────────────┼───────────────┐
               ▼               ▼               ▼
 ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-│    DynamoDB     │  │   Claude API    │  │  Secrets Mgr    │
-│    (State)      │  │   (Haiku 3)     │  │   (API Key)     │
+│    DynamoDB     │  │  AWS Bedrock    │  │   CloudWatch    │
+│  (State+Usage)  │  │ (Mistral Small) │  │    (Metrics)    │
 └─────────────────┘  └─────────────────┘  └─────────────────┘
 ```
 
 ## Cost Budget: $20/month Maximum
 
-### Claude API (Haiku 3) - Target: $10-15/month
-- Pricing: $0.25/1M input tokens, $1.25/1M output tokens
-- Per action (~2000 tokens): ~$0.0015
-- Monthly budget allows: ~10,000 actions
-- Average player: 50-100 actions/session, 3-5 sessions/week
+### Mistral Small (via AWS Bedrock) - Target: $10-15/month
+- Pricing: $1/1M input tokens, $3/1M output tokens
+- Per action (~2000 tokens): ~$0.004
+- Daily limit: 500K tokens (~$1.10/day max)
+- Per-session limit: 50K tokens/day
 
 ### AWS Services - Target: $5-10/month
 | Service | Est. Cost | Notes |
@@ -52,12 +52,22 @@ A text-based RPG web game hosted at **chaos.jurigregg.com** where Claude serves 
 | API Gateway | $1-3 | $3.50/1M requests |
 | DynamoDB | $1-3 | On-demand, ~$1.25/1M writes |
 | S3 + CloudFront | $1-2 | Minimal static hosting |
-| Secrets Manager | $0.40 | 1 secret |
+| Bedrock | $5-10 | Mistral Small usage |
+| CloudWatch | $0.50 | Metrics + alarms |
 | Route 53 | $0.50 | Hosted zone |
 
+### Cost Protection (ADR-010)
+Real-time application-level cost controls:
+- **Global daily limit**: 500,000 tokens/day
+- **Per-session limit**: 50,000 tokens/session/day
+- Pre-request limit checks before AI calls
+- DynamoDB atomic counters for usage tracking
+- CloudWatch alarms at 80% usage threshold
+- In-game narrative messages when limits hit
+
 ### Cost Optimization Strategies
-1. Use Claude Haiku 3 (cheapest model)
-2. Prompt caching for system prompts (90% savings on cached tokens)
+1. Use Mistral Small (good quality, content flexibility)
+2. Application-level token limits (real-time protection)
 3. Compact game state serialization
 4. DynamoDB on-demand (no reserved capacity)
 5. CloudFront caching for static assets
@@ -76,7 +86,7 @@ A text-based RPG web game hosted at **chaos.jurigregg.com** where Claude serves 
 - **Framework**: AWS Lambda + API Gateway
 - **Validation**: Pydantic
 - **Logging**: AWS Lambda Powertools
-- **AI**: Claude API (Haiku 3)
+- **AI**: Mistral Small via AWS Bedrock (see ADR-009)
 
 ### Infrastructure
 - **IaC**: AWS CDK (Python)
@@ -112,13 +122,33 @@ Attributes:
   - character_id: string
   - campaign_setting: string
   - current_location: Location
-  - main_quest: Quest
-  - quest_log: list[Quest]
   - world_state: map (flags like "dragon_slain")
-  - npc_memory: list[NPCMemory]
-  - message_history: list[Message] (last 20)
+  - combat_state: CombatState (active, round, initiative)
+  - combat_enemies: list[CombatEnemy]
+  - message_history: list[Message] (last 50)
   - created_at: ISO timestamp
   - updated_at: ISO timestamp
+```
+
+### Token Usage (DynamoDB)
+```
+# Global daily usage
+PK: USAGE#GLOBAL
+SK: DATE#YYYY-MM-DD
+Attributes:
+  - input_tokens: number
+  - output_tokens: number
+  - request_count: number
+  - ttl: epoch (90 days)
+
+# Per-session daily usage
+PK: SESSION#{session_id}
+SK: USAGE#DATE#YYYY-MM-DD
+Attributes:
+  - input_tokens: number
+  - output_tokens: number
+  - request_count: number
+  - ttl: epoch (7 days)
 ```
 
 ### Message

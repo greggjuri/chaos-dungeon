@@ -1,12 +1,9 @@
 # Chaos Dungeon - Task Tracker
 
-## Current Sprint: Foundation
+## Current Sprint: Polish & Cost Control
 
 ### In Progress
 - None
-
-### To Do (Phase 1 - Foundation)
-- (completed)
 
 ### To Do (Phase 2 - Core Game Loop)
 - [x] init-06-action-handler.md - Process player actions
@@ -37,6 +34,9 @@
 - [x] init-07-combat-system.md - Server-side combat resolution with dice, bestiary, combat resolver
 - [x] init-08-game-ui.md - Chat interface with message history, character status, combat display
 - [x] prp-09-mistral-dm.md - Migrate DM from Claude Haiku to Mistral Small via AWS Bedrock
+- [x] prp-10-cost-protection.md - Application-level cost protection with token limits
+- [x] Token counter UI - Debug overlay showing session/global token usage (press T to toggle)
+- [x] Increase MAX_SESSIONS_PER_USER to 15
 
 ---
 
@@ -49,10 +49,17 @@ None currently.
 1. ~~Anonymous sessions vs Cognito auth for MVP?~~ - Resolved: Anonymous sessions per ADR-005
 2. Preset starting scenarios vs fully procedural?
 
+### Configuration
+- MAX_SESSIONS_PER_USER: 15
+- MAX_MESSAGE_HISTORY: 50
+- GLOBAL_DAILY_TOKENS: 500,000
+- SESSION_DAILY_TOKENS: 50,000
+
 ### Cost Tracking
 - Current estimated monthly: $0 (not deployed)
 - Target: < $20/month
+- Protection: Real-time token limits (ADR-010)
 
 ---
 
-*Last updated: 2026-01-04 (prp-09 Mistral DM migration complete)*
+*Last updated: 2026-01-07 (prp-10 cost protection, token counter UI)*
