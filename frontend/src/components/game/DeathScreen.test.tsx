@@ -2,7 +2,7 @@
  * Tests for DeathScreen component.
  */
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
 import { DeathScreen } from './DeathScreen';
 import { Character } from '../../types';
