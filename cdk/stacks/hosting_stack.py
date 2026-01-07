@@ -104,22 +104,6 @@ class ChaosHostingStack(Stack):
             protocol_policy=cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
         )
 
-        # Cache policy for API (no caching, forward headers)
-        api_cache_policy = cloudfront.CachePolicy(
-            self,
-            "ApiCachePolicy",
-            cache_policy_name=f"{self.prefix}-api-no-cache",
-            default_ttl=Duration.seconds(0),
-            max_ttl=Duration.seconds(0),
-            min_ttl=Duration.seconds(0),
-            query_string_behavior=cloudfront.CacheQueryStringBehavior.all(),
-            header_behavior=cloudfront.CacheHeaderBehavior.allow_list(
-                "Content-Type",
-                "X-User-Id",
-            ),
-            cookie_behavior=cloudfront.CacheCookieBehavior.none(),
-        )
-
         # Origin request policy for API (forward headers to origin)
         api_origin_request_policy = cloudfront.OriginRequestPolicy(
             self,
@@ -148,7 +132,7 @@ class ChaosHostingStack(Stack):
                     viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
                     allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
                     cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
-                    cache_policy=api_cache_policy,
+                    cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
                     origin_request_policy=api_origin_request_policy,
                 ),
             },
