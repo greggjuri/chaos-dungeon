@@ -71,6 +71,8 @@ export interface DiceRoll {
   modifier: number;
   total: number;
   success: boolean | null;
+  attacker?: string;
+  target?: string;
 }
 
 /** API response wrapper */

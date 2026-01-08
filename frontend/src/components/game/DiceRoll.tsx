@@ -10,6 +10,7 @@ interface Props {
 /**
  * Display a single dice roll with type, roll value, modifier, and total.
  * Highlights critical hits (20) in gold and fumbles (1) in red.
+ * Shows attacker/target for combat rolls.
  */
 export function DiceRoll({ roll }: Props) {
   const isCritical = roll.roll === 20;
@@ -35,16 +36,27 @@ export function DiceRoll({ roll }: Props) {
   // Success/fail indicator for attacks
   const successIndicator =
     roll.success === true ? (
-      <span className="ml-2 text-green-400 text-xs">HIT</span>
+      <span className="ml-1 text-green-400 text-xs">HIT</span>
     ) : roll.success === false ? (
-      <span className="ml-2 text-red-400 text-xs">MISS</span>
+      <span className="ml-1 text-red-400 text-xs">MISS</span>
+    ) : null;
+
+  // Build attribution string (e.g., "Goblin → You" or "You → Goblin")
+  const attribution =
+    roll.attacker && roll.target ? (
+      <span className="text-gray-300 text-xs">
+        {roll.attacker} → {roll.target}:
+      </span>
     ) : null;
 
   return (
     <div
       className={`inline-flex items-center gap-1 px-2 py-1 rounded border ${containerClasses}`}
     >
-      <span className="text-gray-400 text-xs uppercase">{roll.type}:</span>
+      {attribution}
+      {!attribution && (
+        <span className="text-gray-400 text-xs uppercase">{roll.type}:</span>
+      )}
       <span className={`text-sm ${rollValueClasses}`}>d20({roll.roll})</span>
       <span className="text-gray-400 text-sm">{modifierStr}</span>
       <span className="text-gray-400 text-sm">=</span>

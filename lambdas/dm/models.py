@@ -97,6 +97,12 @@ class DiceRoll(BaseModel):
     success: bool | None = None
     """Whether the roll succeeded (if applicable)."""
 
+    attacker: str | None = None
+    """Name of the attacker (for combat rolls)."""
+
+    target: str | None = None
+    """Name of the target (for combat rolls)."""
+
 
 class Enemy(BaseModel):
     """Enemy state during combat (basic, from Claude response).
@@ -104,6 +110,9 @@ class Enemy(BaseModel):
     Tracks the current status of enemies in an encounter.
     Used when parsing Claude's response for enemy info.
     """
+
+    id: str | None = None
+    """Unique ID for targeting (set when combat is initiated)."""
 
     name: str
     """Enemy name/type."""

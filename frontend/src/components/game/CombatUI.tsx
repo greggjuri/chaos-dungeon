@@ -52,15 +52,20 @@ export function CombatUI({ combat, onAction, isLoading }: CombatUIProps) {
     hpPercent > 50 ? 'text-green-400' : hpPercent > 25 ? 'text-yellow-400' : 'text-red-400';
 
   return (
-    <div className="bg-gray-900 border border-red-800 rounded-lg p-4 mx-4 mb-4">
-      {/* Combat header */}
-      <div className="text-center mb-4">
-        <div className="text-red-500 font-bold text-lg">⚔️ COMBAT - Round {combat.round}</div>
-        <div className="text-sm text-gray-400">Select a target, then choose your action</div>
+    <div className="bg-gray-900 border-t border-red-800 p-3 mx-2 mb-2">
+      {/* Compact combat header with HP */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-red-500 font-bold text-sm">⚔️ COMBAT - Round {combat.round}</div>
+        <div className="text-sm">
+          <span className="text-gray-400">HP: </span>
+          <span className={`font-bold ${hpColor}`}>
+            {combat.your_hp}/{combat.your_max_hp}
+          </span>
+        </div>
       </div>
 
-      {/* Enemy list */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
+      {/* Enemy list - more compact */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 mb-2">
         {combat.enemies.map((enemy) => (
           <EnemyCard
             key={enemy.id || enemy.name}
@@ -72,14 +77,6 @@ export function CombatUI({ combat, onAction, isLoading }: CombatUIProps) {
         ))}
       </div>
 
-      {/* Player HP status */}
-      <div className="text-center mb-4 p-2 bg-gray-800 rounded">
-        <span className="text-gray-400">Your HP: </span>
-        <span className={`font-bold ${hpColor}`}>
-          {combat.your_hp} / {combat.your_max_hp}
-        </span>
-      </div>
-
       {/* Action buttons */}
       <ActionBar
         availableActions={combat.available_actions}
@@ -89,8 +86,8 @@ export function CombatUI({ combat, onAction, isLoading }: CombatUIProps) {
         disabled={isLoading}
       />
 
-      {/* Combat log */}
-      {combat.combat_log.length > 0 && <CombatLog entries={combat.combat_log} />}
+      {/* Combat log - collapsible, only show last 3 */}
+      {combat.combat_log.length > 0 && <CombatLog entries={combat.combat_log.slice(-3)} />}
     </div>
   );
 }

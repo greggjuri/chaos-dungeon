@@ -336,6 +336,7 @@ class DMService:
                 combat_state,
                 narrative,
                 new_log_entries,
+                attack_results=attack_results,
                 victory=True,
                 xp_gained=xp_gained,
             )
@@ -364,6 +365,7 @@ class DMService:
                 combat_state,
                 narrative,
                 new_log_entries,
+                attack_results=attack_results,
                 victory=False,
                 died=True,
             )
@@ -463,6 +465,7 @@ class DMService:
         combat_state: CombatState,
         narrative: str,
         log_entries: list[CombatLogEntry],
+        attack_results: list | None = None,
         victory: bool = False,
         fled: bool = False,
         died: bool = False,
@@ -518,10 +521,13 @@ class DMService:
             for item in character.get("inventory", [])
         ]
 
+        # Build dice rolls from attack results (includes the killing blow)
+        dice_rolls = self._build_combat_dice_rolls_from_list(attack_results or [])
+
         return ActionResponse(
             narrative=narrative,
             state_changes=StateChanges(xp_delta=xp_gained),
-            dice_rolls=[],
+            dice_rolls=dice_rolls,
             combat_active=False,
             enemies=[],
             combat=CombatResponse(
@@ -584,7 +590,7 @@ class DMService:
         # Get living enemies for response
         living_enemies = [e for e in combat_enemies if e.hp > 0]
         response_enemies = [
-            Enemy(name=e.name, hp=e.hp, ac=e.ac, max_hp=e.max_hp)
+            Enemy(id=e.id, name=e.name, hp=e.hp, ac=e.ac, max_hp=e.max_hp)
             for e in living_enemies
         ]
 
@@ -643,7 +649,7 @@ class DMService:
         """
         dice_rolls = []
         for attack in attack_results:
-            # Attack roll
+            # Attack roll with attacker/target attribution
             dice_rolls.append(
                 DiceRoll(
                     type="attack",
@@ -651,6 +657,8 @@ class DMService:
                     modifier=attack.attack_bonus,
                     total=attack.attack_total,
                     success=attack.is_hit,
+                    attacker=attack.attacker,
+                    target=attack.defender,
                 )
             )
             # Damage roll if hit
@@ -662,6 +670,8 @@ class DMService:
                         modifier=0,
                         total=attack.damage,
                         success=True,
+                        attacker=attack.attacker,
+                        target=attack.defender,
                     )
                 )
         return dice_rolls
@@ -793,7 +803,13 @@ class DMService:
         if is_combat_active:
             combat_enemies_data = session.get("combat_enemies", [])
             response_enemies = [
-                Enemy(name=e["name"], hp=e["hp"], ac=e["ac"], max_hp=e.get("max_hp", e["hp"]))
+                Enemy(
+                    id=e.get("id"),
+                    name=e["name"],
+                    hp=e["hp"],
+                    ac=e["ac"],
+                    max_hp=e.get("max_hp", e["hp"]),
+                )
                 for e in combat_enemies_data
             ]
         else:

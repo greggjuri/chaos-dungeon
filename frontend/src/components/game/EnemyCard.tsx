@@ -35,31 +35,30 @@ export function EnemyCard({ enemy, isSelected, onSelect, selectable }: EnemyCard
       onClick={onSelect}
       disabled={!selectable || isDead}
       className={`
-        p-3 rounded border transition-all text-left w-full
+        p-2 rounded border transition-all text-left w-full
         ${isDead ? 'opacity-40 cursor-not-allowed border-gray-700 bg-gray-900' : ''}
-        ${isSelected && !isDead ? 'border-red-500 bg-red-900/30 ring-2 ring-red-500' : ''}
-        ${!isSelected && !isDead && selectable ? 'border-gray-600 bg-gray-800 hover:border-red-400 hover:bg-gray-700' : ''}
+        ${isSelected && !isDead ? 'border-red-500 bg-red-900/30 ring-1 ring-red-500' : ''}
+        ${!isSelected && !isDead && selectable ? 'border-gray-600 bg-gray-800 hover:border-red-400 hover:bg-gray-700 cursor-pointer' : ''}
         ${!selectable && !isDead ? 'border-gray-700 bg-gray-800 cursor-not-allowed' : ''}
       `}
     >
-      {/* Enemy name */}
-      <div className={`font-bold mb-2 ${isDead ? 'line-through text-gray-500' : 'text-white'}`}>
-        {enemy.name}
-        {isDead && <span className="text-red-500 ml-2">💀</span>}
+      {/* Enemy name and HP on same line */}
+      <div className="flex items-center justify-between mb-1">
+        <span className={`font-medium text-sm ${isDead ? 'line-through text-gray-500' : 'text-white'}`}>
+          {enemy.name}
+          {isDead && <span className="text-red-500 ml-1">💀</span>}
+        </span>
+        <span className="text-xs text-gray-400">
+          {enemy.hp}/{enemy.max_hp}
+        </span>
       </div>
 
-      {/* HP bar */}
-      <div className="h-2 bg-gray-700 rounded overflow-hidden mb-1">
+      {/* HP bar - thinner */}
+      <div className="h-1.5 bg-gray-700 rounded overflow-hidden">
         <div
           className={`h-full transition-all ${getHpBarColor()}`}
           style={{ width: `${Math.max(0, hpPercent)}%` }}
         />
-      </div>
-
-      {/* HP text */}
-      <div className="text-xs text-gray-400">
-        HP: {enemy.hp}/{enemy.max_hp}
-        {enemy.ac && <span className="ml-2">AC: {enemy.ac}</span>}
       </div>
     </button>
   );
