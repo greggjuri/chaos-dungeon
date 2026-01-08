@@ -13,6 +13,8 @@ import {
   UsageStats,
   ApiRequestError,
   isLimitReached,
+  CombatAction,
+  CombatResponse,
 } from '../types';
 
 interface GameState {
@@ -28,6 +30,8 @@ interface GameState {
   combatActive: boolean;
   /** Living enemies in combat */
   enemies: CombatEnemy[];
+  /** Combat UI state (turn-based combat) */
+  combat: CombatResponse | null;
   /** Whether the character is dead */
   characterDead: boolean;
   /** Whether the session has ended */
@@ -42,8 +46,10 @@ interface GameState {
 }
 
 interface UseGameSessionReturn extends GameState {
-  /** Send a player action to the DM */
-  sendAction: (action: string) => Promise<void>;
+  /** Send a player action to the DM (free text or with combat action) */
+  sendAction: (action: string, combatAction?: CombatAction) => Promise<void>;
+  /** Send a combat action (convenience wrapper) */
+  sendCombatAction: (combatAction: CombatAction) => Promise<void>;
   /** Clear the error state */
   clearError: () => void;
   /** Retry loading the session */
@@ -67,6 +73,7 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
   const [messages, setMessages] = useState<GameMessage[]>([]);
   const [combatActive, setCombatActive] = useState(false);
   const [enemies, setEnemies] = useState<CombatEnemy[]>([]);
+  const [combat, setCombat] = useState<CombatResponse | null>(null);
   const [characterDead, setCharacterDead] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -148,15 +155,18 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
    * Send a player action to the DM.
    * Uses optimistic updates - adds the player message immediately,
    * then updates with the response or rolls back on error.
+   *
+   * @param action - Free text action description
+   * @param combatAction - Optional structured combat action for turn-based combat
    */
   const sendAction = useCallback(
-    async (action: string) => {
+    async (action: string, combatAction?: CombatAction) => {
       if (isSendingAction || sessionEnded || characterDead) {
         return;
       }
 
       const trimmedAction = action.trim();
-      if (!trimmedAction) return;
+      if (!trimmedAction && !combatAction) return;
 
       setIsSendingAction(true);
       setError(null);
@@ -164,7 +174,7 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
       // Optimistically add player message
       const playerMessage: GameMessage = {
         role: 'player',
-        content: trimmedAction,
+        content: trimmedAction || getCombatActionLabel(combatAction),
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, playerMessage]);
@@ -172,7 +182,8 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
       try {
         const response = await sessionService.sendAction(
           sessionId,
-          trimmedAction
+          trimmedAction || getCombatActionLabel(combatAction),
+          combatAction
         );
 
         // Handle limit reached response (429)
@@ -210,6 +221,14 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
         setCombatActive(response.combat_active);
         setEnemies(response.enemies.filter((e) => e.hp > 0));
 
+        // Update turn-based combat UI state
+        if (response.combat) {
+          setCombat(response.combat);
+        } else if (!response.combat_active) {
+          // Combat ended, clear combat state
+          setCombat(null);
+        }
+
         // Check for death/session end
         if (response.character_dead) {
           setCharacterDead(true);
@@ -238,6 +257,18 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
     [sessionId, isSendingAction, sessionEnded, characterDead]
   );
 
+  /**
+   * Convenience wrapper for sending combat actions.
+   * Generates a text label for the action for the chat history.
+   */
+  const sendCombatAction = useCallback(
+    async (combatAction: CombatAction) => {
+      const actionLabel = getCombatActionLabel(combatAction);
+      await sendAction(actionLabel, combatAction);
+    },
+    [sendAction]
+  );
+
   const clearError = useCallback(() => {
     setError(null);
   }, []);
@@ -254,6 +285,7 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
     messages,
     combatActive,
     enemies,
+    combat,
     characterDead,
     sessionEnded,
     isLoading,
@@ -261,7 +293,28 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
     error,
     usage,
     sendAction,
+    sendCombatAction,
     clearError,
     retryLoad,
   };
+}
+
+/**
+ * Get a human-readable label for a combat action.
+ */
+function getCombatActionLabel(action?: CombatAction): string {
+  if (!action) return '';
+
+  switch (action.action_type) {
+    case 'attack':
+      return action.target_id ? `Attack ${action.target_id}` : 'Attack';
+    case 'defend':
+      return 'Defend';
+    case 'flee':
+      return 'Flee';
+    case 'use_item':
+      return action.item_id ? `Use ${action.item_id}` : 'Use item';
+    default:
+      return 'Action';
+  }
 }

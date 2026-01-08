@@ -8,6 +8,7 @@ import {
   CharacterStatus,
   ChatHistory,
   CombatStatus,
+  CombatUI,
   DeathScreen,
   TokenCounter,
 } from '../components/game';
@@ -27,6 +28,7 @@ export function GamePage() {
     messages,
     combatActive,
     enemies,
+    combat,
     characterDead,
     sessionEnded,
     isLoading,
@@ -34,6 +36,7 @@ export function GamePage() {
     error,
     usage,
     sendAction,
+    sendCombatAction,
     retryLoad,
   } = useGameSession(sessionId || '');
 
@@ -106,15 +109,28 @@ export function GamePage() {
       {/* Chat history - scrollable middle */}
       <ChatHistory messages={messages} isLoading={isSendingAction} />
 
-      {/* Combat status - above input when in combat */}
-      <CombatStatus enemies={enemies} combatActive={combatActive} />
+      {/* Combat UI - shown when turn-based combat is active */}
+      {combat && combat.active && (
+        <CombatUI
+          combat={combat}
+          onAction={sendCombatAction}
+          isLoading={isSendingAction}
+        />
+      )}
 
-      {/* Action input - sticky bottom */}
-      <ActionInput
-        onSend={sendAction}
-        disabled={sessionEnded || characterDead}
-        isLoading={isSendingAction}
-      />
+      {/* Legacy combat status - shown when combat active but no turn-based UI */}
+      {combatActive && (!combat || !combat.active) && (
+        <CombatStatus enemies={enemies} combatActive={combatActive} />
+      )}
+
+      {/* Action input - shown when NOT in turn-based combat */}
+      {(!combat || !combat.active) && (
+        <ActionInput
+          onSend={sendAction}
+          disabled={sessionEnded || characterDead}
+          isLoading={isSendingAction}
+        />
+      )}
 
       {/* Token counter overlay - toggle with 'T' key */}
       <TokenCounter usage={usage} />

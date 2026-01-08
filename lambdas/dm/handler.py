@@ -21,7 +21,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 from pydantic import ValidationError
 
-from dm.models import ActionRequest
+from dm.models import ActionRequest, CombatAction
 from dm.service import DMService
 from shared.config import get_config
 from shared.cost_guard import CostGuard, get_limit_message
@@ -128,10 +128,16 @@ def post_action(session_id: str) -> Response:
     service = get_service()
 
     try:
+        # Pass structured combat action if provided
+        combat_action: CombatAction | None = None
+        if request.combat_action:
+            combat_action = request.combat_action
+
         response = service.process_action(
             session_id=session_id,
             user_id=user_id,
             action=request.action,
+            combat_action=combat_action,
         )
         return Response(
             status_code=200,

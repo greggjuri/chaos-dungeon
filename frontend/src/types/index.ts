@@ -184,6 +184,51 @@ export interface CombatEnemy {
   ac: number;
 }
 
+// ============ Turn-Based Combat Types ============
+
+/** Combat phase state */
+export type CombatPhase =
+  | 'combat_start'
+  | 'player_turn'
+  | 'resolve_player'
+  | 'enemy_turn'
+  | 'combat_end';
+
+/** Player combat action types */
+export type CombatActionType = 'attack' | 'defend' | 'flee' | 'use_item';
+
+/** Structured combat action */
+export interface CombatAction {
+  action_type: CombatActionType;
+  target_id?: string;
+  item_id?: string;
+}
+
+/** Combat log entry */
+export interface CombatLogEntry {
+  round: number;
+  actor: string;
+  action: string;
+  target?: string;
+  roll?: number;
+  damage?: number;
+  result: string;
+  narrative: string;
+}
+
+/** Full combat state for turn-based UI */
+export interface CombatResponse {
+  active: boolean;
+  round: number;
+  phase: CombatPhase;
+  your_hp: number;
+  your_max_hp: number;
+  enemies: CombatEnemy[];
+  available_actions: CombatActionType[];
+  valid_targets: string[];
+  combat_log: CombatLogEntry[];
+}
+
 /** Character snapshot from action response */
 export interface CharacterSnapshot {
   hp: number;
@@ -209,6 +254,7 @@ export interface FullActionResponse {
   dice_rolls: DiceRoll[];
   combat_active: boolean;
   enemies: CombatEnemy[];
+  combat?: CombatResponse;
   character: CharacterSnapshot;
   character_dead: boolean;
   session_ended: boolean;

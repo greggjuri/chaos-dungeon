@@ -1,9 +1,50 @@
 """Pydantic models for DM response parsing and action handling."""
 
+from enum import Enum
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+class CombatPhase(str, Enum):
+    """Combat state machine phases."""
+
+    COMBAT_START = "combat_start"
+    PLAYER_TURN = "player_turn"
+    RESOLVE_PLAYER = "resolve_player"
+    ENEMY_TURN = "enemy_turn"
+    COMBAT_END = "combat_end"
+
+
+class CombatActionType(str, Enum):
+    """Player combat action types."""
+
+    ATTACK = "attack"
+    DEFEND = "defend"  # +2 AC this round
+    FLEE = "flee"  # Dex check to escape
+    USE_ITEM = "use_item"  # Potion, etc.
+
+
+class CombatAction(BaseModel):
+    """Player's chosen combat action."""
+
+    action_type: CombatActionType
+    target_id: str | None = None  # For attack actions
+    item_id: str | None = None  # For use item actions
+
+
+class CombatLogEntry(BaseModel):
+    """Single entry in combat log."""
+
+    round: int
+    actor: str  # "player" or enemy ID/name
+    action: str  # "attack", "defend", "flee"
+    target: str | None = None
+    roll: int | None = None  # Attack roll total
+    damage: int | None = None
+    result: str  # "hit", "miss", "killed", "fled", "defended"
+    narrative: str = ""  # AI-generated description
 
 
 class StateChanges(BaseModel):
@@ -81,7 +122,7 @@ class CombatState(BaseModel):
     """Active combat encounter state.
 
     Tracks the current state of an ongoing combat encounter,
-    including initiative and round number.
+    including initiative, round number, and phase.
     """
 
     active: bool = False
@@ -90,11 +131,20 @@ class CombatState(BaseModel):
     round: int = 0
     """Current combat round number."""
 
+    phase: CombatPhase = CombatPhase.PLAYER_TURN
+    """Current phase in the combat state machine."""
+
     player_initiative: int = 0
     """Player's initiative roll for this combat."""
 
     enemy_initiative: int = 0
     """Enemies' initiative roll for this combat."""
+
+    player_defending: bool = False
+    """Whether player is defending (+2 AC) this round."""
+
+    combat_log: list[CombatLogEntry] = Field(default_factory=list)
+    """Log of all combat actions this encounter."""
 
 
 class CombatEnemy(BaseModel):
@@ -232,14 +282,24 @@ class DMResponse(BaseModel):
 class ActionRequest(BaseModel):
     """Player action request."""
 
-    action: str = Field(..., min_length=1, max_length=500)
-    """The player's action text (1-500 chars)."""
+    action: str = Field(default="", max_length=500)
+    """The player's action text (0-500 chars). Can be empty if combat_action provided."""
+
+    combat_action: CombatAction | None = None
+    """Structured combat action (takes precedence over free text action)."""
 
     @field_validator("action")
     @classmethod
     def validate_action(cls, v: str) -> str:
         """Strip whitespace from action."""
         return v.strip()
+
+    @model_validator(mode="after")
+    def validate_has_action(self) -> "ActionRequest":
+        """Ensure either action or combat_action is provided."""
+        if not self.action and not self.combat_action:
+            raise ValueError("Either action or combat_action must be provided")
+        return self
 
 
 class CharacterSnapshot(BaseModel):
@@ -280,6 +340,37 @@ class UsageStats(BaseModel):
     """Global daily token limit."""
 
 
+class CombatResponse(BaseModel):
+    """Structured combat state for turn-based UI."""
+
+    active: bool
+    """Whether combat is ongoing."""
+
+    round: int
+    """Current round number."""
+
+    phase: CombatPhase
+    """Current combat phase."""
+
+    your_hp: int
+    """Player's current HP."""
+
+    your_max_hp: int
+    """Player's max HP."""
+
+    enemies: list[Enemy]
+    """Enemy status list."""
+
+    available_actions: list[CombatActionType]
+    """Actions player can take this turn."""
+
+    valid_targets: list[str]
+    """Enemy IDs that can be targeted."""
+
+    combat_log: list[CombatLogEntry]
+    """Recent combat log entries."""
+
+
 class ActionResponse(BaseModel):
     """Full response to player action."""
 
@@ -297,6 +388,9 @@ class ActionResponse(BaseModel):
 
     enemies: list[Enemy]
     """Current enemy status (if in combat)."""
+
+    combat: CombatResponse | None = None
+    """Structured combat state for turn-based UI (only during combat)."""
 
     character: CharacterSnapshot
     """Updated character state."""

@@ -3,7 +3,7 @@
 ## Current Sprint: Polish & Cost Control
 
 ### In Progress
-- None
+- [ ] prp-12-turn-based-combat.md - Integration testing in browser (deployed, needs manual verification)
 
 ### To Do (Phase 2 - Core Game Loop)
 - [x] init-06-action-handler.md - Process player actions
@@ -62,4 +62,4 @@ None currently.
 
 ---
 
-*Last updated: 2026-01-07 (prp-11 domain setup infrastructure)*
+*Last updated: 2026-01-08 (prp-12 turn-based combat implementation)*

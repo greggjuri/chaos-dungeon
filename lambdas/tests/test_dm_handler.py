@@ -121,9 +121,12 @@ class TestPostAction:
 
         assert result["statusCode"] == 401
 
-    def test_post_action_empty_action(self, mock_service, mock_context):
+    def test_post_action_empty_action(self, mock_service, mock_cost_guard, mock_context):
         """POST action with empty action should return 400."""
-        with patch("dm.handler._service", mock_service):
+        with (
+            patch("dm.handler._service", mock_service),
+            patch("dm.handler._cost_guard", mock_cost_guard),
+        ):
             from dm.handler import lambda_handler
 
             event = make_api_event(body={"action": ""})
@@ -131,9 +134,12 @@ class TestPostAction:
 
         assert result["statusCode"] == 400
 
-    def test_post_action_missing_action(self, mock_service, mock_context):
+    def test_post_action_missing_action(self, mock_service, mock_cost_guard, mock_context):
         """POST action without action field should return 400."""
-        with patch("dm.handler._service", mock_service):
+        with (
+            patch("dm.handler._service", mock_service),
+            patch("dm.handler._cost_guard", mock_cost_guard),
+        ):
             from dm.handler import lambda_handler
 
             event = make_api_event(body={})
@@ -141,9 +147,12 @@ class TestPostAction:
 
         assert result["statusCode"] == 400
 
-    def test_post_action_action_too_long(self, mock_service, mock_context):
+    def test_post_action_action_too_long(self, mock_service, mock_cost_guard, mock_context):
         """POST action with action > 500 chars should return 400."""
-        with patch("dm.handler._service", mock_service):
+        with (
+            patch("dm.handler._service", mock_service),
+            patch("dm.handler._cost_guard", mock_cost_guard),
+        ):
             from dm.handler import lambda_handler
 
             event = make_api_event(body={"action": "x" * 501})

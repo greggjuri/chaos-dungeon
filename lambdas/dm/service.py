@@ -10,10 +10,25 @@ from aws_lambda_powertools import Logger
 from dm.bedrock_client import MistralResponse
 from dm.bestiary import spawn_enemy
 from dm.combat import CombatResolver
+from dm.combat_narrator import (
+    COMBAT_NARRATOR_SYSTEM_PROMPT,
+    build_combat_log_entries,
+    build_defend_log_entry,
+    build_defend_narrative,
+    build_flee_log_entry,
+    build_flee_narrative,
+    build_narrator_prompt,
+)
+from dm.combat_parser import get_default_action, parse_combat_action
 from dm.models import (
     ActionResponse,
     CharacterSnapshot,
+    CombatAction,
+    CombatActionType,
     CombatEnemy,
+    CombatLogEntry,
+    CombatPhase,
+    CombatResponse,
     CombatState,
     DiceRoll,
     DMResponse,
@@ -23,7 +38,6 @@ from dm.models import (
 )
 from dm.parser import parse_dm_response
 from dm.prompts import DMPromptBuilder
-from dm.prompts.combat_prompt import build_combat_outcome_prompt
 from shared.cost_limits import CostLimits
 from shared.db import DynamoDBClient, convert_floats_to_decimal
 from shared.dice import roll as roll_dice_notation
@@ -134,6 +148,7 @@ class DMService:
         session_id: str,
         user_id: str,
         action: str,
+        combat_action: CombatAction | None = None,
     ) -> ActionResponse:
         """Process a player action and return the DM response.
 
@@ -143,6 +158,7 @@ class DMService:
             session_id: Session UUID
             user_id: User UUID
             action: Player action text
+            combat_action: Optional structured combat action (takes precedence)
 
         Returns:
             ActionResponse with narrative, state changes, and character state
@@ -186,7 +202,9 @@ class DMService:
         # Check if we're in active combat
         combat_state = session.get("combat_state", {})
         if combat_state.get("active"):
-            response = self._process_combat_action(session, character, action, user_id, session_id)
+            response = self._process_combat_action(
+                session, character, action, user_id, session_id, combat_action
+            )
         else:
             response = self._process_normal_action(session, character, action, user_id, session_id)
 
@@ -214,10 +232,11 @@ class DMService:
         action: str,
         user_id: str,
         session_id: str,
+        combat_action: CombatAction | None = None,
     ) -> ActionResponse:
-        """Process an action during active combat.
+        """Process an action during active combat using turn-based system.
 
-        Combat is resolved mechanically on the server, then Claude narrates.
+        Combat is resolved mechanically on the server, then AI narrates.
 
         Args:
             session: Session dict from DynamoDB
@@ -225,6 +244,7 @@ class DMService:
             action: Player's action text
             user_id: User UUID
             session_id: Session UUID
+            combat_action: Optional structured combat action
 
         Returns:
             ActionResponse with combat results
@@ -238,91 +258,283 @@ class DMService:
 
         combat_enemies = [CombatEnemy(**e) for e in combat_enemies_data]
 
+        # Parse action if not structured
+        if not combat_action:
+            combat_action = parse_combat_action(action, combat_enemies)
+            if not combat_action:
+                combat_action = get_default_action(combat_enemies)
+
         logger.info(
-            "Resolving combat round",
+            "Processing turn-based combat",
             extra={
                 "round": combat_state.round,
                 "enemies": len(combat_enemies),
+                "action_type": combat_action.action_type.value,
+                "target": combat_action.target_id,
             },
         )
 
-        # Resolve combat mechanically
-        round_result = self.combat_resolver.resolve_combat_round(
-            character, combat_state, combat_enemies
+        # Track attack results and new log entries
+        attack_results: list = []
+        new_log_entries: list[CombatLogEntry] = []
+        xp_gained = 0
+        fled = False
+        player_defending = False
+        narrative = ""
+
+        # ========== PLAYER TURN ==========
+        player_attack, fled, player_defending = self.combat_resolver.resolve_player_turn(
+            character, combat_action, combat_enemies
         )
 
-        # Build outcome prompt for Claude - it can only narrate, not decide
-        outcome_prompt = build_combat_outcome_prompt(
-            round_result,
-            character["name"],
-            character["max_hp"],
-        )
-
-        # Get narrative from Claude
-        campaign = session.get("campaign_setting", "default")
-        system_prompt = self.prompt_builder.build_system_prompt(campaign)
-        client = self._get_ai_client()
-        ai_response = client.send_action(system_prompt, outcome_prompt, action)
-
-        # Record token usage and get stats
-        usage_stats = self._record_usage(session_id, ai_response)
-
-        # Parse response (only for narrative, state is from combat)
-        dm_response = parse_dm_response(ai_response.text)
-
-        # Apply XP from combat
-        character["xp"] += round_result.xp_gained
-
-        # Build dice rolls from attack results
-        dice_rolls = self._build_combat_dice_rolls(round_result)
-
-        # Update combat state in session
-        if round_result.combat_ended:
-            session["combat_state"] = {"active": False, "round": 0}
-            session["combat_enemies"] = []
-            logger.info(
-                "Combat ended",
-                extra={"player_dead": round_result.player_dead},
+        # Handle flee
+        if fled:
+            new_log_entries.append(build_flee_log_entry(combat_state.round, True))
+            narrative = build_flee_narrative(True)
+            return self._end_combat_response(
+                session,
+                character,
+                session_id,
+                combat_state,
+                narrative,
+                new_log_entries,
+                victory=False,
+                fled=True,
             )
-        else:
-            session["combat_state"] = combat_state.model_dump()
-            session["combat_enemies"] = [e.model_dump() for e in combat_enemies if e.hp > 0]
+
+        # Handle defend
+        if player_defending:
+            new_log_entries.append(build_defend_log_entry(combat_state.round))
+
+        # Handle player attack result
+        if player_attack:
+            attack_results.append(player_attack)
+            if player_attack.target_dead:
+                # Find the enemy that was killed to get XP
+                for enemy in combat_enemies:
+                    if enemy.name == player_attack.defender and enemy.hp <= 0:
+                        xp_gained += enemy.xp_value
+                        break
+
+        # Check if all enemies dead after player turn
+        combat_ended, player_won, total_xp = self.combat_resolver.check_combat_end(
+            character, combat_enemies
+        )
+        if combat_ended and player_won:
+            xp_gained = total_xp  # Award all XP on victory
+            # Generate victory narrative
+            narrative = self._generate_combat_narrative(
+                attack_results, character["name"], session_id
+            ) if attack_results else "Victory! All enemies have been defeated."
+            new_log_entries.extend(
+                build_combat_log_entries(attack_results, combat_state.round, character["name"])
+            )
+            return self._end_combat_response(
+                session,
+                character,
+                session_id,
+                combat_state,
+                narrative,
+                new_log_entries,
+                victory=True,
+                xp_gained=xp_gained,
+            )
+
+        # ========== ENEMY TURN ==========
+        enemy_results = self.combat_resolver.resolve_enemy_phase(
+            character, combat_enemies, player_defending
+        )
+        attack_results.extend(enemy_results)
+
+        # Check for player death
+        combat_ended, player_won, _ = self.combat_resolver.check_combat_end(
+            character, combat_enemies
+        )
+        if combat_ended and not player_won:
+            narrative = self._generate_combat_narrative(
+                attack_results, character["name"], session_id
+            ) if attack_results else "You have fallen in battle."
+            new_log_entries.extend(
+                build_combat_log_entries(attack_results, combat_state.round, character["name"])
+            )
+            return self._end_combat_response(
+                session,
+                character,
+                session_id,
+                combat_state,
+                narrative,
+                new_log_entries,
+                victory=False,
+                died=True,
+            )
+
+        # ========== CONTINUE COMBAT ==========
+        # Generate narrative for the round
+        narrative = self._generate_combat_narrative(
+            attack_results, character["name"], session_id
+        ) if attack_results else (
+            build_defend_narrative() if player_defending else "The combatants circle warily."
+        )
+
+        # Build log entries
+        new_log_entries.extend(
+            build_combat_log_entries(attack_results, combat_state.round, character["name"])
+        )
+
+        # Update combat state
+        combat_state.phase = CombatPhase.PLAYER_TURN
+        combat_state.player_defending = False
+        combat_state.combat_log.extend(new_log_entries)
+
+        # Persist updated state
+        session["combat_state"] = combat_state.model_dump()
+        session["combat_enemies"] = [e.model_dump() for e in combat_enemies]
 
         # Update message history
-        session = self._append_messages(session, action, dm_response.narrative)
+        action_text = action if action else combat_action.action_type.value
+        session = self._append_messages(session, action_text, narrative)
 
-        # Check for character death
-        character_dead = round_result.player_dead
-        session_ended = round_result.player_dead
-        if character_dead:
-            session["status"] = "ended"
-            session["ended_reason"] = "character_death"
-            logger.info(
-                "Character died in combat",
-                extra={"character": character["name"]},
-            )
+        # Apply XP gained this round (from kills)
+        character["xp"] += xp_gained
 
         # Build response
+        return self._build_combat_action_response(
+            session, character, combat_state, combat_enemies, narrative, attack_results, None
+        )
+
+    def _generate_combat_narrative(
+        self, attack_results: list, player_name: str, session_id: str
+    ) -> str:
+        """Generate AI narrative for combat results.
+
+        Args:
+            attack_results: List of AttackResult from combat
+            player_name: Player character name
+            session_id: For usage tracking
+
+        Returns:
+            Narrative string
+        """
+        if not attack_results:
+            return ""
+
+        try:
+            prompt = build_narrator_prompt(attack_results, player_name)
+            client = self._get_ai_client()
+            ai_response = client.send_action(
+                COMBAT_NARRATOR_SYSTEM_PROMPT,
+                "",  # No additional context needed
+                prompt,
+            )
+            # Record usage
+            self._record_usage(session_id, ai_response)
+            return ai_response.text.strip()
+        except Exception as e:
+            logger.warning(f"Failed to generate combat narrative: {e}")
+            # Fallback to simple description
+            return self._build_fallback_narrative(attack_results, player_name)
+
+    def _build_fallback_narrative(self, attack_results: list, player_name: str) -> str:
+        """Build a fallback narrative if AI fails.
+
+        Args:
+            attack_results: List of AttackResult
+            player_name: Player character name
+
+        Returns:
+            Simple narrative string
+        """
+        parts = []
+        for result in attack_results:
+            if result.is_hit:
+                if result.target_dead:
+                    parts.append(f"{result.attacker} strikes down {result.defender}!")
+                else:
+                    parts.append(f"{result.attacker} hits {result.defender} for {result.damage} damage.")
+            else:
+                parts.append(f"{result.attacker} misses {result.defender}.")
+        return " ".join(parts)
+
+    def _end_combat_response(
+        self,
+        session: dict,
+        character: dict,
+        session_id: str,
+        combat_state: CombatState,
+        narrative: str,
+        log_entries: list[CombatLogEntry],
+        victory: bool = False,
+        fled: bool = False,
+        died: bool = False,
+        xp_gained: int = 0,
+    ) -> ActionResponse:
+        """Build response for combat ending.
+
+        Args:
+            session: Session dict
+            character: Character dict
+            session_id: Session ID
+            combat_state: Current combat state
+            narrative: Narrative text
+            log_entries: Combat log entries
+            victory: True if player won
+            fled: True if player fled
+            died: True if player died
+            xp_gained: XP to award
+
+        Returns:
+            ActionResponse with combat end state
+        """
+        # Apply XP
+        character["xp"] += xp_gained
+
+        # Clear combat state
+        session["combat_state"] = {
+            "active": False,
+            "round": 0,
+            "phase": CombatPhase.COMBAT_END.value,
+            "player_initiative": 0,
+            "enemy_initiative": 0,
+            "player_defending": False,
+            "combat_log": [],
+        }
+        session["combat_enemies"] = []
+
+        # Handle death
+        character_dead = died
+        session_ended = died
+        if died:
+            session["status"] = "ended"
+            session["ended_reason"] = "character_death"
+            logger.info("Character died in combat", extra={"character": character["name"]})
+
+        # Update message history
+        action_summary = "Fled combat" if fled else ("Victory!" if victory else "Defeat")
+        session = self._append_messages(session, action_summary, narrative)
+
+        # Build inventory list
         inventory_names = [
             item["name"] if isinstance(item, dict) else item
             for item in character.get("inventory", [])
         ]
 
-        # Convert remaining enemies to Enemy models for response
-        remaining_enemies = [
-            Enemy(name=e.name, hp=e.hp, ac=e.ac, max_hp=e.max_hp)
-            for e in round_result.enemies_remaining
-        ]
-
         return ActionResponse(
-            narrative=dm_response.narrative,
-            state_changes=StateChanges(
-                hp_delta=round_result.player_hp - character.get("max_hp", 0),
-                xp_delta=round_result.xp_gained,
+            narrative=narrative,
+            state_changes=StateChanges(xp_delta=xp_gained),
+            dice_rolls=[],
+            combat_active=False,
+            enemies=[],
+            combat=CombatResponse(
+                active=False,
+                round=combat_state.round,
+                phase=CombatPhase.COMBAT_END,
+                your_hp=character["hp"],
+                your_max_hp=character["max_hp"],
+                enemies=[],
+                available_actions=[],
+                valid_targets=[],
+                combat_log=log_entries,
             ),
-            dice_rolls=dice_rolls,
-            combat_active=not round_result.combat_ended,
-            enemies=remaining_enemies,
             character=CharacterSnapshot(
                 hp=character["hp"],
                 max_hp=character["max_hp"],
@@ -333,8 +545,126 @@ class DMService:
             ),
             character_dead=character_dead,
             session_ended=session_ended,
+            usage=None,
+        )
+
+    def _build_combat_action_response(
+        self,
+        session: dict,
+        character: dict,
+        combat_state: CombatState,
+        combat_enemies: list[CombatEnemy],
+        narrative: str,
+        attack_results: list,
+        usage_stats: UsageStats | None,
+    ) -> ActionResponse:
+        """Build ActionResponse for ongoing combat.
+
+        Args:
+            session: Session dict
+            character: Character dict
+            combat_state: Current combat state
+            combat_enemies: List of enemies
+            narrative: Narrative text
+            attack_results: Attack results this round
+            usage_stats: Token usage stats
+
+        Returns:
+            ActionResponse with combat state
+        """
+        # Build dice rolls from attack results
+        dice_rolls = self._build_combat_dice_rolls_from_list(attack_results)
+
+        # Build inventory list
+        inventory_names = [
+            item["name"] if isinstance(item, dict) else item
+            for item in character.get("inventory", [])
+        ]
+
+        # Get living enemies for response
+        living_enemies = [e for e in combat_enemies if e.hp > 0]
+        response_enemies = [
+            Enemy(name=e.name, hp=e.hp, ac=e.ac, max_hp=e.max_hp)
+            for e in living_enemies
+        ]
+
+        # Build available actions
+        available_actions = [
+            CombatActionType.ATTACK,
+            CombatActionType.DEFEND,
+            CombatActionType.FLEE,
+        ]
+        # Add USE_ITEM if player has potions
+        if any("potion" in (item.get("name", item) if isinstance(item, dict) else item).lower()
+               for item in character.get("inventory", [])):
+            available_actions.append(CombatActionType.USE_ITEM)
+
+        # Get valid targets
+        valid_targets = [e.id for e in living_enemies]
+
+        return ActionResponse(
+            narrative=narrative,
+            state_changes=StateChanges(),
+            dice_rolls=dice_rolls,
+            combat_active=True,
+            enemies=response_enemies,
+            combat=CombatResponse(
+                active=True,
+                round=combat_state.round,
+                phase=combat_state.phase,
+                your_hp=character["hp"],
+                your_max_hp=character["max_hp"],
+                enemies=response_enemies,
+                available_actions=available_actions,
+                valid_targets=valid_targets,
+                combat_log=combat_state.combat_log[-10:],  # Last 10 entries
+            ),
+            character=CharacterSnapshot(
+                hp=character["hp"],
+                max_hp=character["max_hp"],
+                xp=character["xp"],
+                gold=character["gold"],
+                level=character["level"],
+                inventory=inventory_names,
+            ),
+            character_dead=False,
+            session_ended=False,
             usage=usage_stats,
         )
+
+    def _build_combat_dice_rolls_from_list(self, attack_results: list) -> list[DiceRoll]:
+        """Build DiceRoll list from attack results.
+
+        Args:
+            attack_results: List of AttackResult
+
+        Returns:
+            List of DiceRoll for the response
+        """
+        dice_rolls = []
+        for attack in attack_results:
+            # Attack roll
+            dice_rolls.append(
+                DiceRoll(
+                    type="attack",
+                    roll=attack.attack_roll,
+                    modifier=attack.attack_bonus,
+                    total=attack.attack_total,
+                    success=attack.is_hit,
+                )
+            )
+            # Damage roll if hit
+            if attack.is_hit and attack.damage > 0:
+                dice_rolls.append(
+                    DiceRoll(
+                        type="damage",
+                        roll=sum(attack.damage_rolls) if attack.damage_rolls else attack.damage,
+                        modifier=0,
+                        total=attack.damage,
+                        success=True,
+                    )
+                )
+        return dice_rolls
 
     def _process_normal_action(
         self,
