@@ -1,5 +1,5 @@
 /**
- * Death screen overlay component.
+ * Death screen component displayed inline at the bottom of chat.
  */
 import { useNavigate } from 'react-router-dom';
 import { Character, CharacterSnapshot } from '../../types';
@@ -10,8 +10,8 @@ interface Props {
 }
 
 /**
- * Full-screen overlay displayed when character dies.
- * Shows final stats and navigation options.
+ * Inline death notice displayed at the bottom of chat when character dies.
+ * Shows final stats and navigation options without blocking the chat history.
  */
 export function DeathScreen({ character, snapshot }: Props) {
   const navigate = useNavigate();
@@ -22,49 +22,47 @@ export function DeathScreen({ character, snapshot }: Props) {
   const gold = snapshot?.gold ?? character.gold;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
-      <div className="text-center px-6 max-w-md">
-        {/* Death icon */}
-        <div className="text-6xl mb-6">💀</div>
-
-        {/* Death message */}
-        <h1 className="text-3xl font-bold text-red-500 mb-2">YOU HAVE DIED</h1>
-        <p className="text-gray-400 text-lg mb-8">
-          {character.name} has fallen. Their adventure ends here.
-        </p>
-
-        {/* Final stats */}
-        <div className="bg-gray-900/80 rounded-lg p-6 mb-8 border border-red-900/50">
-          <h2 className="text-gray-400 text-sm uppercase tracking-wider mb-4">
-            Final Record
-          </h2>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <div className="text-2xl font-bold text-white">{level}</div>
-              <div className="text-gray-500 text-sm">Level</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-blue-400">{xp}</div>
-              <div className="text-gray-500 text-sm">XP</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-yellow-400">{gold}</div>
-              <div className="text-gray-500 text-sm">Gold</div>
-            </div>
+    <div className="border-t border-red-900/50 bg-gradient-to-t from-red-950/30 to-gray-900 p-4">
+      <div className="max-w-2xl mx-auto">
+        {/* Compact death header */}
+        <div className="flex items-center gap-3 mb-4">
+          <span className="text-3xl">💀</span>
+          <div>
+            <h1 className="text-xl font-bold text-red-500">YOU HAVE DIED</h1>
+            <p className="text-gray-400 text-sm">
+              {character.name} has fallen. Their adventure ends here.
+            </p>
           </div>
         </div>
 
-        {/* Navigation buttons */}
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        {/* Final stats - compact inline */}
+        <div className="flex items-center gap-6 mb-4 text-sm">
+          <span className="text-gray-500">Final Record:</span>
+          <span>
+            <span className="text-white font-medium">{level}</span>
+            <span className="text-gray-500 ml-1">Level</span>
+          </span>
+          <span>
+            <span className="text-blue-400 font-medium">{xp}</span>
+            <span className="text-gray-500 ml-1">XP</span>
+          </span>
+          <span>
+            <span className="text-yellow-400 font-medium">{gold}</span>
+            <span className="text-gray-500 ml-1">Gold</span>
+          </span>
+        </div>
+
+        {/* Navigation buttons - compact row */}
+        <div className="flex gap-3">
           <button
             onClick={() => navigate('/characters/new')}
-            className="px-6 py-3 rounded-lg font-medium bg-amber-600 text-white hover:bg-amber-500 transition-colors"
+            className="px-4 py-2 rounded-lg font-medium text-sm bg-amber-600 text-white hover:bg-amber-500 transition-colors"
           >
             Create New Character
           </button>
           <button
             onClick={() => navigate('/characters')}
-            className="px-6 py-3 rounded-lg font-medium bg-gray-700 text-gray-200 hover:bg-gray-600 transition-colors"
+            className="px-4 py-2 rounded-lg font-medium text-sm bg-gray-700 text-gray-200 hover:bg-gray-600 transition-colors"
           >
             Character List
           </button>

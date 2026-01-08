@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class CharacterClass(str, Enum):
@@ -60,14 +60,20 @@ class Character(BaseModel):
     name: str = Field(..., min_length=1, max_length=50)
     character_class: CharacterClass
     level: int = Field(default=1, ge=1, le=36)
-    xp: int = Field(default=0, ge=0)
+    xp: int = Field(default=0)
     hp: int = Field(default=1, ge=0)
     max_hp: int = Field(default=1, ge=1)
-    gold: int = Field(default=0, ge=0)
+    gold: int = Field(default=0)
     abilities: AbilityScores
     inventory: list[Item] = Field(default_factory=list)
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     updated_at: str | None = None
+
+    @field_validator("xp", "gold", mode="before")
+    @classmethod
+    def clamp_non_negative(cls, v: int) -> int:
+        """Clamp XP and gold to minimum 0 (defensive against corrupted data)."""
+        return max(0, int(v)) if v is not None else 0
 
     def to_db_keys(self) -> tuple[str, str]:
         """Get DynamoDB PK and SK for this character.

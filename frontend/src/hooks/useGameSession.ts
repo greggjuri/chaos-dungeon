@@ -172,9 +172,11 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
       setError(null);
 
       // Optimistically add player message
+      // Use combat enemies for resolving target names in action labels
+      const combatEnemies = combat?.enemies;
       const playerMessage: GameMessage = {
         role: 'player',
-        content: trimmedAction || getCombatActionLabel(combatAction),
+        content: trimmedAction || getCombatActionLabel(combatAction, combatEnemies),
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, playerMessage]);
@@ -182,7 +184,7 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
       try {
         const response = await sessionService.sendAction(
           sessionId,
-          trimmedAction || getCombatActionLabel(combatAction),
+          trimmedAction || getCombatActionLabel(combatAction, combatEnemies),
           combatAction
         );
 
@@ -254,7 +256,7 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
         setIsSendingAction(false);
       }
     },
-    [sessionId, isSendingAction, sessionEnded, characterDead]
+    [sessionId, isSendingAction, sessionEnded, characterDead, combat]
   );
 
   /**
@@ -263,10 +265,10 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
    */
   const sendCombatAction = useCallback(
     async (combatAction: CombatAction) => {
-      const actionLabel = getCombatActionLabel(combatAction);
+      const actionLabel = getCombatActionLabel(combatAction, combat?.enemies);
       await sendAction(actionLabel, combatAction);
     },
-    [sendAction]
+    [sendAction, combat]
   );
 
   const clearError = useCallback(() => {
@@ -301,13 +303,23 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
 
 /**
  * Get a human-readable label for a combat action.
+ * @param action - The combat action
+ * @param enemies - List of enemies to resolve target names
  */
-function getCombatActionLabel(action?: CombatAction): string {
+function getCombatActionLabel(
+  action?: CombatAction,
+  enemies?: CombatEnemy[]
+): string {
   if (!action) return '';
 
   switch (action.action_type) {
-    case 'attack':
-      return action.target_id ? `Attack ${action.target_id}` : 'Attack';
+    case 'attack': {
+      if (!action.target_id) return 'Attack';
+      // Look up enemy name from enemies list
+      const target = enemies?.find((e) => e.id === action.target_id);
+      const targetName = target?.name || 'enemy';
+      return `Attack ${targetName}`;
+    }
     case 'defend':
       return 'Defend';
     case 'flee':

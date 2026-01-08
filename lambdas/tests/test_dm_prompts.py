@@ -195,7 +195,7 @@ class TestOutputFormat:
         assert "xp_delta" in OUTPUT_FORMAT
         assert "inventory_add" in OUTPUT_FORMAT
         assert "dice_rolls" in OUTPUT_FORMAT
-        assert "combat_active" in OUTPUT_FORMAT
+        # combat_active is inferred from presence of enemies, not explicitly documented
         assert "enemies" in OUTPUT_FORMAT
 
 

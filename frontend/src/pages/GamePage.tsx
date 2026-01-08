@@ -91,11 +91,6 @@ export function GamePage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] bg-gray-900">
-      {/* Death screen overlay */}
-      {characterDead && (
-        <DeathScreen character={character} snapshot={characterSnapshot} />
-      )}
-
       {/* Character status bar - sticky top */}
       <CharacterStatus character={character} snapshot={characterSnapshot} />
 
@@ -123,11 +118,16 @@ export function GamePage() {
         <CombatStatus enemies={enemies} combatActive={combatActive} />
       )}
 
-      {/* Action input - shown when NOT in turn-based combat */}
-      {(!combat || !combat.active) && (
+      {/* Death screen - shown inline at bottom when character dies */}
+      {characterDead && (
+        <DeathScreen character={character} snapshot={characterSnapshot} />
+      )}
+
+      {/* Action input - shown when NOT in turn-based combat and NOT dead */}
+      {!characterDead && (!combat || !combat.active) && (
         <ActionInput
           onSend={sendAction}
-          disabled={sessionEnded || characterDead}
+          disabled={sessionEnded}
           isLoading={isSendingAction}
         />
       )}
