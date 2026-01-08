@@ -465,6 +465,86 @@ Use single domain architecture where CloudFront serves both frontend (from S3) a
 
 ---
 
+## ADR-012: Pydantic Model Validators for "At Least One Of" Business Rules
+
+**Date**: 2026-01-08
+**Status**: Accepted
+
+### Context
+
+When implementing turn-based combat (PRP-12), the `ActionRequest` model needed to accept either:
+- `action` (free text) for exploration mode
+- `combat_action` (structured object) for combat mode
+- Or both (combat_action takes precedence)
+
+The original implementation made `action` optional with `default=""`, but this created a regression: requests with neither field would pass field-level validation and proceed to the handler, causing undefined behavior (in testing, this manifested as memory exhaustion/hangs).
+
+### Decision
+
+Use Pydantic's `@model_validator` for "at least one of X or Y" business rules, rather than relying on field-level validation alone.
+
+```python
+from pydantic import BaseModel, model_validator
+
+class ActionRequest(BaseModel):
+    action: str = Field(default="", max_length=500)
+    combat_action: CombatAction | None = None
+
+    @model_validator(mode="after")
+    def validate_has_action(self) -> "ActionRequest":
+        """Ensure either action or combat_action is provided."""
+        if not self.action and not self.combat_action:
+            raise ValueError("Either action or combat_action must be provided")
+        return self
+```
+
+### Rationale
+
+- **Clean separation**: Field validators handle individual field constraints (max_length, type); model validators handle cross-field invariants
+- **Fail fast**: Validation happens at model construction, before any business logic
+- **Clear errors**: Pydantic surfaces the ValueError as a 400 with descriptive message
+- **Testable**: Unit tests can verify the constraint directly on the model
+
+### Alternatives Considered
+
+| Approach | Verdict |
+|----------|---------|
+| Handler-level check | Validation too late; harder to test; duplicated across endpoints |
+| Make `action` required, check for empty | Doesn't support combat_action-only requests |
+| Union type `action: str \| CombatAction` | Loses semantic distinction between modes |
+| Custom root validator | `model_validator(mode="after")` is the Pydantic v2 equivalent |
+
+### Consequences
+
+**Positive:**
+- Consistent 400 response for invalid requests
+- Tests can verify model invariants independently
+- Handler code stays clean (no defensive checks)
+- Pattern is reusable for similar "at least one" constraints
+
+**Negative:**
+- Developers must remember to add model validators for cross-field rules
+- Pydantic v2 syntax differs from v1 (`@model_validator` vs `@root_validator`)
+
+### Pattern Template
+
+For any "at least one of" requirement:
+
+```python
+@model_validator(mode="after")
+def require_at_least_one(self) -> "ModelName":
+    if not self.field_a and not self.field_b:
+        raise ValueError("At least one of field_a or field_b required")
+    return self
+```
+
+### References
+
+- [Pydantic Model Validators](https://docs.pydantic.dev/latest/concepts/validators/#model-validators)
+- PRP: `prps/prp-12-turn-based-combat.md`
+
+---
+
 ## Template for New Decisions
 
 ```markdown
