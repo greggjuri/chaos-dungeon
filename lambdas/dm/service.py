@@ -807,12 +807,41 @@ class DMService:
             },
         )
 
+        # Build CombatResponse if combat was just initiated
+        combat_response = None
+        if is_combat_active:
+            combat_enemies_data = session.get("combat_enemies", [])
+            combat_state_data = session.get("combat_state", {})
+
+            # Build available actions
+            available_actions = [
+                CombatActionType.ATTACK,
+                CombatActionType.DEFEND,
+                CombatActionType.FLEE,
+            ]
+            if any("potion" in (item.get("name", item) if isinstance(item, dict) else item).lower()
+                   for item in character.get("inventory", [])):
+                available_actions.append(CombatActionType.USE_ITEM)
+
+            combat_response = CombatResponse(
+                active=True,
+                round=combat_state_data.get("round", 0),
+                phase=CombatPhase.PLAYER_TURN,
+                your_hp=character["hp"],
+                your_max_hp=character["max_hp"],
+                enemies=response_enemies,
+                available_actions=available_actions,
+                valid_targets=[e.get("id", "") for e in combat_enemies_data],
+                combat_log=[],
+            )
+
         return ActionResponse(
             narrative=dm_response.narrative,
             state_changes=dm_response.state_changes,
             dice_rolls=dm_response.dice_rolls,
             combat_active=is_combat_active,
             enemies=response_enemies,
+            combat=combat_response,
             character=CharacterSnapshot(
                 hp=character["hp"],
                 max_hp=character["max_hp"],
