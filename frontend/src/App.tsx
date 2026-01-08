@@ -6,6 +6,7 @@
 import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import { UserProvider } from './context';
 import { AppLayout, AgeGate } from './components';
+import { Version } from './components/ui';
 import {
   HomePage,
   CharactersPage,
@@ -25,6 +26,7 @@ function RootLayout() {
       <AppLayout>
         <Outlet />
       </AppLayout>
+      <Version />
     </UserProvider>
   );
 }
