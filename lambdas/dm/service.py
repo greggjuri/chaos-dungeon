@@ -424,11 +424,21 @@ class DMService:
         try:
             prompt = build_narrator_prompt(attack_results, player_name)
             client = self._get_ai_client()
-            ai_response = client.send_action(
-                COMBAT_NARRATOR_SYSTEM_PROMPT,
-                "",  # No additional context needed
-                prompt,
-            )
+
+            # Use dedicated narrator method if available (Bedrock), otherwise fallback
+            if hasattr(client, "narrate_combat"):
+                ai_response = client.narrate_combat(
+                    COMBAT_NARRATOR_SYSTEM_PROMPT,
+                    prompt,
+                )
+            else:
+                # Fallback for Claude client
+                ai_response = client.send_action(
+                    COMBAT_NARRATOR_SYSTEM_PROMPT,
+                    "",
+                    prompt,
+                )
+
             # Record usage
             self._record_usage(session_id, ai_response)
 

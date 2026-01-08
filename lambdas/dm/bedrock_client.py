@@ -147,3 +147,29 @@ class BedrockClient:
             max_tokens=800,  # Reduced for cost
             temperature=0.8,
         )
+
+    def narrate_combat(
+        self,
+        system_prompt: str,
+        combat_actions: str,
+    ) -> MistralResponse:
+        """Generate combat narrative from mechanical results.
+
+        Uses a simpler prompt format optimized for narrative generation
+        without the DM response wrapper that can leak.
+
+        Args:
+            system_prompt: The narrator system prompt
+            combat_actions: Mechanical description of what happened
+
+        Returns:
+            MistralResponse with narrative text
+        """
+        # Simple prompt without "Respond as the Dungeon Master" wrapper
+        prompt = f"<s>[INST] {system_prompt}\n\n{combat_actions} [/INST]"
+
+        return self.invoke_mistral(
+            prompt=prompt,
+            max_tokens=200,  # Short narrative only
+            temperature=0.7,  # Slightly more focused
+        )

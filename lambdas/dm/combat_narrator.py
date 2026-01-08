@@ -22,6 +22,11 @@ PROMPT_LEAK_PATTERNS = [
     r"^Output.*narrative.*$",
     r"^\d+\.\s+(Human|Player|Wizard|Rogue|Paladin|Cleric|Fighter).*casts?.*$",
     r"^Here'?s? (the|a) narrative.*:?\s*$",
+    # Additional patterns for Mistral leakage
+    r"^Dungeon Master\.?$",
+    r"^\d+\.\s+\w+\s+(hits|misses|strikes|kills|crits|fumbles).*\(\d+\s*(damage|HP).*\).*$",
+    r".*\(\w+\s+has\s+\d+\s+HP\s+remaining\).*$",
+    r"^.*dealing\s+\d+\s+damage.*$",
 ]
 
 
