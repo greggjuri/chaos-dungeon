@@ -1,13 +1,12 @@
 /**
  * Turn-based combat UI component.
  *
- * Displays enemy status, action buttons, and combat log.
+ * Minimal compact interface showing enemies and action buttons.
  * Player selects targets and actions through this interface.
  */
 import { useState, useCallback } from 'react';
 import { CombatAction, CombatResponse } from '../../types';
 import { ActionBar } from './ActionBar';
-import { CombatLog } from './CombatLog';
 import { EnemyCard } from './EnemyCard';
 
 interface CombatUIProps {
@@ -20,8 +19,7 @@ interface CombatUIProps {
 }
 
 /**
- * Main combat interface showing enemies, player status,
- * action buttons, and combat log.
+ * Compact combat interface showing enemies and action buttons.
  */
 export function CombatUI({ combat, onAction, isLoading }: CombatUIProps) {
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
@@ -52,42 +50,39 @@ export function CombatUI({ combat, onAction, isLoading }: CombatUIProps) {
     hpPercent > 50 ? 'text-green-400' : hpPercent > 25 ? 'text-yellow-400' : 'text-red-400';
 
   return (
-    <div className="bg-gray-900 border-t border-red-800 p-3 mx-2 mb-2">
-      {/* Compact combat header with HP */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-red-500 font-bold text-sm">⚔️ COMBAT - Round {combat.round}</div>
-        <div className="text-sm">
-          <span className="text-gray-400">HP: </span>
-          <span className={`font-bold ${hpColor}`}>
-            {combat.your_hp}/{combat.your_max_hp}
-          </span>
+    <div className="bg-gray-900/95 border-t border-red-800/50 px-2 py-1.5">
+      {/* Single row: Round, Enemies, HP, Actions */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Round indicator */}
+        <span className="text-red-500 font-bold text-xs whitespace-nowrap">⚔️ R{combat.round}</span>
+
+        {/* Enemy pills - compact inline */}
+        <div className="flex gap-1 flex-wrap flex-1">
+          {combat.enemies.map((enemy) => (
+            <EnemyCard
+              key={enemy.id || enemy.name}
+              enemy={enemy}
+              isSelected={effectiveTarget === enemy.id}
+              onSelect={() => enemy.id && handleEnemySelect(enemy.id)}
+              selectable={enemy.id ? combat.valid_targets.includes(enemy.id) : false}
+            />
+          ))}
         </div>
+
+        {/* HP */}
+        <span className={`text-xs font-bold ${hpColor} whitespace-nowrap`}>
+          {combat.your_hp}/{combat.your_max_hp} HP
+        </span>
+
+        {/* Compact action buttons */}
+        <ActionBar
+          availableActions={combat.available_actions}
+          selectedTarget={effectiveTarget}
+          hasValidTarget={combat.valid_targets.length > 0}
+          onAction={handleAction}
+          disabled={isLoading}
+        />
       </div>
-
-      {/* Enemy list - more compact */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 mb-2">
-        {combat.enemies.map((enemy) => (
-          <EnemyCard
-            key={enemy.id || enemy.name}
-            enemy={enemy}
-            isSelected={effectiveTarget === enemy.id}
-            onSelect={() => enemy.id && handleEnemySelect(enemy.id)}
-            selectable={enemy.id ? combat.valid_targets.includes(enemy.id) : false}
-          />
-        ))}
-      </div>
-
-      {/* Action buttons */}
-      <ActionBar
-        availableActions={combat.available_actions}
-        selectedTarget={effectiveTarget}
-        hasValidTarget={combat.valid_targets.length > 0}
-        onAction={handleAction}
-        disabled={isLoading}
-      />
-
-      {/* Combat log - collapsible, only show last 3 */}
-      {combat.combat_log.length > 0 && <CombatLog entries={combat.combat_log.slice(-3)} />}
     </div>
   );
 }

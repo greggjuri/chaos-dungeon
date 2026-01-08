@@ -69,10 +69,10 @@ class CombatResolver:
         damage = 0
         damage_rolls: list[int] = []
         hp_before = target.hp
+        weapon_dice = self._get_weapon_damage(character)
 
         if is_hit:
             # Roll damage
-            weapon_dice = self._get_weapon_damage(character)
             damage, damage_rolls = roll(weapon_dice)
             damage = max(1, damage + str_mod)  # Minimum 1 damage on hit
             target.hp = max(0, target.hp - damage)
@@ -100,6 +100,7 @@ class CombatResolver:
             is_critical=is_crit,
             is_fumble=is_fumble,
             damage=damage,
+            damage_dice=weapon_dice,
             damage_rolls=damage_rolls,
             target_hp_before=hp_before,
             target_hp_after=target.hp,
@@ -165,6 +166,7 @@ class CombatResolver:
             is_critical=is_crit,
             is_fumble=is_fumble,
             damage=damage,
+            damage_dice=enemy.damage_dice,
             damage_rolls=damage_rolls,
             target_hp_before=hp_before,
             target_hp_after=hp_after,
@@ -423,6 +425,7 @@ class CombatResolver:
                 is_critical=is_crit,
                 is_fumble=is_fumble,
                 damage=damage,
+                damage_dice=enemy.damage_dice,
                 damage_rolls=damage_rolls,
                 target_hp_before=hp_before,
                 target_hp_after=hp_after,

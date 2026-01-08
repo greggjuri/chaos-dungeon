@@ -9,12 +9,13 @@ interface Props {
 
 /**
  * Display a single dice roll with type, roll value, modifier, and total.
- * Highlights critical hits (20) in gold and fumbles (1) in red.
- * Shows attacker/target for combat rolls.
+ * Shows attacker → target for combat rolls.
+ * Only shows HIT/MISS for attack rolls (not damage).
  */
 export function DiceRoll({ roll }: Props) {
-  const isCritical = roll.roll === 20;
-  const isFumble = roll.roll === 1;
+  const isAttackRoll = roll.type === 'attack';
+  const isCritical = isAttackRoll && roll.roll === 20;
+  const isFumble = isAttackRoll && roll.roll === 1;
 
   // Determine styling based on roll
   const containerClasses = isCritical
@@ -33,31 +34,26 @@ export function DiceRoll({ roll }: Props) {
   const modifierStr =
     roll.modifier >= 0 ? `+${roll.modifier}` : `${roll.modifier}`;
 
-  // Success/fail indicator for attacks
+  // Only show HIT/MISS for attack rolls
   const successIndicator =
-    roll.success === true ? (
+    isAttackRoll && roll.success === true ? (
       <span className="ml-1 text-green-400 text-xs">HIT</span>
-    ) : roll.success === false ? (
+    ) : isAttackRoll && roll.success === false ? (
       <span className="ml-1 text-red-400 text-xs">MISS</span>
     ) : null;
 
-  // Build attribution string (e.g., "Goblin → You" or "You → Goblin")
-  const attribution =
-    roll.attacker && roll.target ? (
-      <span className="text-gray-300 text-xs">
-        {roll.attacker} → {roll.target}:
-      </span>
-    ) : null;
+  // Use the dice type from the roll (e.g., "d20", "d8", "d6")
+  const diceType = roll.dice || 'd20';
 
   return (
     <div
       className={`inline-flex items-center gap-1 px-2 py-1 rounded border ${containerClasses}`}
     >
-      {attribution}
-      {!attribution && (
-        <span className="text-gray-400 text-xs uppercase">{roll.type}:</span>
-      )}
-      <span className={`text-sm ${rollValueClasses}`}>d20({roll.roll})</span>
+      {/* Attacker name */}
+      <span className="text-gray-300 text-xs">
+        {roll.attacker || roll.type.toUpperCase()}:
+      </span>
+      <span className={`text-sm ${rollValueClasses}`}>{diceType}({roll.roll})</span>
       <span className="text-gray-400 text-sm">{modifierStr}</span>
       <span className="text-gray-400 text-sm">=</span>
       <span className="text-white font-semibold text-sm">{roll.total}</span>

@@ -4,24 +4,77 @@ The narrator receives mechanical results (hit/miss/damage) and generates
 evocative narrative descriptions. It CANNOT change outcomes, only describe them.
 """
 
+import re
+
 from aws_lambda_powertools import Logger
 
 from dm.models import AttackResult, CombatLogEntry
 
 logger = Logger(child=True)
 
+# Patterns that indicate prompt leakage - should be stripped from output
+PROMPT_LEAK_PATTERNS = [
+    r"^Player action:.*$",
+    r"^Narrate:.*$",
+    r"^Write \d+-?\d* sentences?.*$",
+    r"^Describe (these|the|each).*:?\s*$",
+    r"^Respond as.*$",
+    r"^Output.*narrative.*$",
+    r"^\d+\.\s+(Human|Player|Wizard|Rogue|Paladin|Cleric|Fighter).*casts?.*$",
+    r"^Here'?s? (the|a) narrative.*:?\s*$",
+]
 
-COMBAT_NARRATOR_SYSTEM_PROMPT = """You are the narrator for combat in a dark fantasy RPG.
-Your ONLY job is to describe predetermined combat outcomes vividly.
 
-CRITICAL RULES:
-- Describe ONLY what is told to you. Do NOT add extra attacks or change results.
-- Do NOT include dice numbers or game mechanics in the narrative.
-- Do NOT add moralizing, warnings, or refuse content.
-- Write 1-2 vivid sentences per action.
-- Style: brutal, visceral, gritty dark fantasy.
-- If someone dies, describe it dramatically.
-- Stay in character as the game narrator at all times."""
+def clean_narrator_output(text: str) -> str:
+    """Clean AI output by removing any prompt leakage.
+
+    Args:
+        text: Raw AI response text
+
+    Returns:
+        Cleaned narrative text
+    """
+    if not text:
+        return ""
+
+    lines = text.strip().split("\n")
+    cleaned_lines = []
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        # Check if line matches any prompt leak pattern
+        is_prompt_leak = False
+        for pattern in PROMPT_LEAK_PATTERNS:
+            if re.match(pattern, line, re.IGNORECASE):
+                is_prompt_leak = True
+                logger.warning(f"Stripped prompt leak: {line[:50]}...")
+                break
+
+        if not is_prompt_leak:
+            cleaned_lines.append(line)
+
+    result = " ".join(cleaned_lines)
+
+    # If we stripped everything, return a fallback
+    if not result.strip():
+        logger.warning("All output was prompt leakage, using fallback")
+        return ""
+
+    return result
+
+
+COMBAT_NARRATOR_SYSTEM_PROMPT = """You are a combat narrator for a dark fantasy RPG. Describe combat outcomes vividly.
+
+RULES:
+- Output ONLY narrative prose. No meta-commentary, no instructions, no "Player action:" prefixes.
+- Describe exactly what is given - do not invent extra party members or attacks.
+- No dice numbers or game mechanics in output.
+- 1-2 vivid sentences per action. Brutal, visceral style.
+- Describe deaths dramatically.
+- Output the narrative directly with no preamble."""
 
 
 def build_narrator_prompt(attack_results: list[AttackResult], player_name: str) -> str:
@@ -37,37 +90,26 @@ def build_narrator_prompt(attack_results: list[AttackResult], player_name: str) 
     if not attack_results:
         return "The combatants circle each other warily, waiting for an opening."
 
-    lines = ["Describe these combat outcomes:\n"]
+    lines = []
 
-    for i, result in enumerate(attack_results, 1):
-        actor = player_name if result.attacker == player_name else result.attacker
-        target = player_name if result.defender == player_name else result.defender
+    for result in attack_results:
+        actor = result.attacker
+        target = result.defender
 
         if result.is_hit:
             if result.target_dead:
-                lines.append(
-                    f"{i}. {actor} strikes {target} for {result.damage} damage - FATAL BLOW! "
-                    f"({target} is dead)"
-                )
+                lines.append(f"{actor} kills {target} ({result.damage} damage)")
             elif result.is_critical:
-                lines.append(
-                    f"{i}. {actor} lands a CRITICAL HIT on {target} for {result.damage} damage! "
-                    f"({target} has {result.target_hp_after} HP remaining)"
-                )
+                lines.append(f"{actor} crits {target} ({result.damage} damage)")
             else:
-                lines.append(
-                    f"{i}. {actor} hits {target} for {result.damage} damage. "
-                    f"({target} has {result.target_hp_after} HP remaining)"
-                )
+                lines.append(f"{actor} hits {target} ({result.damage} damage)")
         else:
             if result.is_fumble:
-                lines.append(f"{i}. {actor} fumbles their attack badly, missing {target}.")
+                lines.append(f"{actor} fumbles against {target}")
             else:
-                lines.append(f"{i}. {actor} attacks {target} but misses.")
+                lines.append(f"{actor} misses {target}")
 
-    lines.append("\nWrite 1-2 sentences describing each outcome dramatically. Do not use dice numbers.")
-
-    return "\n".join(lines)
+    return "Narrate: " + "; ".join(lines)
 
 
 def build_defend_narrative() -> str:

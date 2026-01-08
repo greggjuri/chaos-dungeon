@@ -67,6 +67,7 @@ export interface Session {
 /** Dice roll result from server */
 export interface DiceRoll {
   type: string;
+  dice: string;
   roll: number;
   modifier: number;
   total: number;

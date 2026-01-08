@@ -85,6 +85,9 @@ class DiceRoll(BaseModel):
     type: str
     """Type of roll: attack, damage, save, skill, initiative, etc."""
 
+    dice: str = "d20"
+    """Die used (e.g., 'd20', 'd8', 'd6')."""
+
     roll: int
     """Raw dice result (before modifiers)."""
 
@@ -223,6 +226,9 @@ class AttackResult(BaseModel):
 
     damage: int = 0
     """Damage dealt (0 if miss)."""
+
+    damage_dice: str = "1d6"
+    """Damage dice notation used (e.g., '1d6', '1d8')."""
 
     damage_rolls: list[int] = Field(default_factory=list)
     """Individual damage dice results."""

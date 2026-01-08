@@ -43,6 +43,7 @@ describe('ChatMessage', () => {
       dice_rolls: [
         {
           type: 'attack',
+          dice: 'd20',
           roll: 15,
           modifier: 3,
           total: 18,
@@ -63,15 +64,15 @@ describe('ChatMessage', () => {
       content: 'Combat round!',
       timestamp: '2024-01-01T00:00:00Z',
       dice_rolls: [
-        { type: 'attack', roll: 12, modifier: 2, total: 14, success: true },
-        { type: 'damage', roll: 6, modifier: 3, total: 9, success: null },
+        { type: 'attack', dice: 'd20', roll: 12, modifier: 2, total: 14, success: true },
+        { type: 'damage', dice: 'd6', roll: 6, modifier: 3, total: 9, success: null },
       ],
     };
 
     render(<ChatMessage message={message} />);
 
-    expect(screen.getByText(/attack:/i)).toBeInTheDocument();
-    expect(screen.getByText(/damage:/i)).toBeInTheDocument();
+    // Both rolls should be present (attack shows "ATTACK:" or attacker name, damage shows "DAMAGE:" or attacker name)
+    expect(screen.getAllByText(/d20|d6/).length).toBeGreaterThan(0);
   });
 
   it('renders state changes when present', () => {

@@ -18,6 +18,7 @@ from dm.combat_narrator import (
     build_flee_log_entry,
     build_flee_narrative,
     build_narrator_prompt,
+    clean_narrator_output,
 )
 from dm.combat_parser import get_default_action, parse_combat_action
 from dm.models import (
@@ -430,7 +431,13 @@ class DMService:
             )
             # Record usage
             self._record_usage(session_id, ai_response)
-            return ai_response.text.strip()
+
+            # Clean the response to remove any prompt leakage
+            cleaned = clean_narrator_output(ai_response.text)
+            if not cleaned:
+                # If cleaning removed everything, use fallback
+                return self._build_fallback_narrative(attack_results, player_name)
+            return cleaned
         except Exception as e:
             logger.warning(f"Failed to generate combat narrative: {e}")
             # Fallback to simple description
@@ -653,6 +660,7 @@ class DMService:
             dice_rolls.append(
                 DiceRoll(
                     type="attack",
+                    dice="d20",
                     roll=attack.attack_roll,
                     modifier=attack.attack_bonus,
                     total=attack.attack_total,
@@ -663,13 +671,26 @@ class DMService:
             )
             # Damage roll if hit
             if attack.is_hit and attack.damage > 0:
+                # Extract die type from damage_dice (e.g., "1d6" -> "d6", "2d4+1" -> "d4")
+                damage_die = "d6"  # default
+                if hasattr(attack, "damage_dice") and attack.damage_dice:
+                    import re
+                    match = re.search(r"d(\d+)", attack.damage_dice)
+                    if match:
+                        damage_die = f"d{match.group(1)}"
+
+                # Calculate modifier (total - raw roll)
+                raw_roll = sum(attack.damage_rolls) if attack.damage_rolls else attack.damage
+                damage_mod = attack.damage - raw_roll
+
                 dice_rolls.append(
                     DiceRoll(
                         type="damage",
-                        roll=sum(attack.damage_rolls) if attack.damage_rolls else attack.damage,
-                        modifier=0,
+                        dice=damage_die,
+                        roll=raw_roll,
+                        modifier=damage_mod,
                         total=attack.damage,
-                        success=True,
+                        success=None,  # No success/fail for damage
                         attacker=attack.attacker,
                         target=attack.defender,
                     )

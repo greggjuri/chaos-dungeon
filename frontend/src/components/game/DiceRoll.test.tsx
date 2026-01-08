@@ -9,6 +9,7 @@ import { DiceRoll as DiceRollType } from '../../types';
 describe('DiceRoll', () => {
   const baseRoll: DiceRollType = {
     type: 'attack',
+    dice: 'd20',
     roll: 10,
     modifier: 3,
     total: 13,
@@ -18,7 +19,8 @@ describe('DiceRoll', () => {
   it('renders roll type, value, modifier, and total', () => {
     render(<DiceRoll roll={baseRoll} />);
 
-    expect(screen.getByText(/attack:/i)).toBeInTheDocument();
+    // Shows type label (uppercase) when no attacker
+    expect(screen.getByText(/ATTACK:/)).toBeInTheDocument();
     expect(screen.getByText(/d20\(10\)/)).toBeInTheDocument();
     expect(screen.getByText('+3')).toBeInTheDocument();
     expect(screen.getByText('13')).toBeInTheDocument();
