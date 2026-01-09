@@ -114,8 +114,8 @@ class Enemy(BaseModel):
     Used when parsing Claude's response for enemy info.
     """
 
-    id: str | None = None
-    """Unique ID for targeting (set when combat is initiated)."""
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    """Unique ID for targeting (always generated if not provided)."""
 
     name: str
     """Enemy name/type."""
@@ -373,8 +373,8 @@ class CombatResponse(BaseModel):
     your_max_hp: int
     """Player's max HP."""
 
-    enemies: list[Enemy]
-    """Enemy status list."""
+    enemies: list[dict[str, Any]]
+    """Enemy status list as dicts to ensure id field is serialized."""
 
     available_actions: list[CombatActionType]
     """Actions player can take this turn."""
@@ -401,8 +401,8 @@ class ActionResponse(BaseModel):
     combat_active: bool
     """Whether combat is ongoing."""
 
-    enemies: list[Enemy]
-    """Current enemy status (if in combat)."""
+    enemies: list[dict[str, Any]]
+    """Current enemy status (if in combat) as dicts to ensure id field is serialized."""
 
     combat: CombatResponse | None = None
     """Structured combat state for turn-based UI (only during combat)."""

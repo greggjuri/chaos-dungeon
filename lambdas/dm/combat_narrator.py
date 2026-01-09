@@ -47,6 +47,14 @@ HP_LEAK_PATTERNS = [
     r"\s*\(?now\s+at\s+\d+\s*(HP|health)\)?\.?",  # "now at 15 HP"
 ]
 
+# Inline markers to strip (not line-based - can appear anywhere)
+INLINE_MARKERS = [
+    r"\[Narrative\]:?\s*",  # [Narrative] or [Narrative]: prefix
+    r"\[JSON\]:?\s*",  # [JSON] or [JSON]: prefix
+    r"\[Output\]:?\s*",  # [Output] prefix
+    r"^Narrative:\s*",  # Narrative: prefix at start
+]
+
 
 def clean_narrator_output(text: str) -> str:
     """Clean AI output by removing any prompt leakage.
@@ -80,6 +88,13 @@ def clean_narrator_output(text: str) -> str:
             cleaned_lines.append(line)
 
     result = " ".join(cleaned_lines)
+
+    # Strip inline markers like [Narrative] or [JSON] from anywhere in text
+    for pattern in INLINE_MARKERS:
+        original = result
+        result = re.sub(pattern, "", result, flags=re.IGNORECASE)
+        if result != original:
+            logger.warning(f"Stripped inline marker: {pattern[:30]}...")
 
     # Clean HP/health leaks from within the text
     for pattern in HP_LEAK_PATTERNS:

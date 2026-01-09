@@ -24,12 +24,16 @@ interface CombatUIProps {
 export function CombatUI({ combat, onAction, isLoading }: CombatUIProps) {
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
 
-  // Debug: log combat data
+  // Debug: log combat data with FULL enemy objects
   useEffect(() => {
     console.log('[CombatUI] combat data:', {
       enemies: combat.enemies.map(e => ({ id: e.id, name: e.name, hp: e.hp })),
       valid_targets: combat.valid_targets,
       round: combat.round
+    });
+    // Log FULL enemy objects to see all fields
+    combat.enemies.forEach((enemy, idx) => {
+      console.log(`[CombatUI] enemy[${idx}] FULL object:`, JSON.stringify(enemy));
     });
   }, [combat]);
 

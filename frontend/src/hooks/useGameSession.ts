@@ -225,6 +225,7 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
 
         // Update turn-based combat UI state
         if (response.combat) {
+          console.log('[useGameSession] Combat response FULL:', JSON.stringify(response.combat, null, 2));
           setCombat(response.combat);
         } else if (!response.combat_active) {
           // Combat ended, clear combat state
@@ -233,11 +234,9 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
 
         // Check for death/session end
         if (response.character_dead) {
-          console.log('[useGameSession] Character died! Response:', {
-            narrative: response.narrative,
-            dice_rolls: response.dice_rolls,
-            character_dead: response.character_dead
-          });
+          console.log('[useGameSession] Character died! FULL response:', JSON.stringify(response, null, 2));
+          console.log('[useGameSession] dice_rolls array:', response.dice_rolls);
+          console.log('[useGameSession] dice_rolls length:', response.dice_rolls?.length);
           setCharacterDead(true);
           setSessionEnded(true);
         } else if (response.session_ended) {

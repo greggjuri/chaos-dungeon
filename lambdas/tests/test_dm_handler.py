@@ -39,7 +39,7 @@ def sample_action_response():
         state_changes=StateChanges(hp_delta=-2, xp_delta=10),
         dice_rolls=[DiceRoll(type="attack", roll=15, modifier=3, total=18, success=True)],
         combat_active=True,
-        enemies=[Enemy(name="Goblin", hp=3, ac=12)],
+        enemies=[{"id": "goblin-1", "name": "Goblin", "hp": 3, "ac": 12, "max_hp": 3}],
         character=CharacterSnapshot(
             hp=6,
             max_hp=8,

@@ -637,7 +637,7 @@ class DMService:
             for item in character.get("inventory", [])
         ]
 
-        # Get living enemies for response
+        # Get living enemies for response - use dicts to ensure id is serialized
         living_enemies = [e for e in combat_enemies if e.hp > 0]
         response_enemies = []
         for e in living_enemies:
@@ -646,12 +646,16 @@ class DMService:
                 # Generate ID if missing (shouldn't happen)
                 enemy_id = str(uuid4())
                 logger.warning(f"Combat enemy {e.name} missing ID, generated: {enemy_id}")
-            response_enemies.append(
-                Enemy(id=enemy_id, name=e.name, hp=e.hp, ac=e.ac, max_hp=e.max_hp)
-            )
+            response_enemies.append({
+                "id": enemy_id,
+                "name": e.name,
+                "hp": e.hp,
+                "ac": e.ac,
+                "max_hp": e.max_hp,
+            })
         logger.debug(
             "Built combat response enemies",
-            extra={"enemies": [{"id": e.id, "name": e.name} for e in response_enemies]},
+            extra={"enemies": response_enemies},
         )
 
         # Build available actions
@@ -874,6 +878,7 @@ class DMService:
         is_combat_active = session.get("combat_state", {}).get("active", False)
 
         # Get enemies from session if combat is active, otherwise from Claude's response
+        # Use dicts to ensure id field is always serialized
         if is_combat_active:
             combat_enemies_data = session.get("combat_enemies", [])
             response_enemies = []
@@ -883,23 +888,23 @@ class DMService:
                     # Generate ID if missing (shouldn't happen but safety net)
                     enemy_id = str(uuid4())
                     logger.warning(f"Enemy {e.get('name')} missing ID, generated: {enemy_id}")
-                response_enemies.append(
-                    Enemy(
-                        id=enemy_id,
-                        name=e["name"],
-                        hp=e["hp"],
-                        ac=e["ac"],
-                        max_hp=e.get("max_hp", e["hp"]),
-                    )
-                )
+                response_enemies.append({
+                    "id": enemy_id,
+                    "name": e["name"],
+                    "hp": e["hp"],
+                    "ac": e["ac"],
+                    "max_hp": e.get("max_hp", e["hp"]),
+                })
             logger.debug(
                 "Built response_enemies from session",
-                extra={
-                    "enemies": [{"id": e.id, "name": e.name} for e in response_enemies],
-                },
+                extra={"enemies": response_enemies},
             )
         else:
-            response_enemies = dm_response.enemies
+            # Convert Enemy objects to dicts for non-combat responses
+            response_enemies = [
+                {"id": e.id, "name": e.name, "hp": e.hp, "ac": e.ac, "max_hp": e.max_hp}
+                for e in (dm_response.enemies or [])
+            ]
 
         logger.debug(
             "Building action response",
