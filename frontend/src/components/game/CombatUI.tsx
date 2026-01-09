@@ -4,7 +4,7 @@
  * Minimal compact interface showing enemies and action buttons.
  * Player selects targets and actions through this interface.
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { CombatAction, CombatResponse } from '../../types';
 import { ActionBar } from './ActionBar';
 import { EnemyCard } from './EnemyCard';
@@ -24,6 +24,15 @@ interface CombatUIProps {
 export function CombatUI({ combat, onAction, isLoading }: CombatUIProps) {
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
 
+  // Debug: log combat data
+  useEffect(() => {
+    console.log('[CombatUI] combat data:', {
+      enemies: combat.enemies.map(e => ({ id: e.id, name: e.name, hp: e.hp })),
+      valid_targets: combat.valid_targets,
+      round: combat.round
+    });
+  }, [combat]);
+
   // Auto-select first valid target if none selected
   const effectiveTarget = selectedTarget && combat.valid_targets.includes(selectedTarget)
     ? selectedTarget
@@ -41,7 +50,12 @@ export function CombatUI({ combat, onAction, isLoading }: CombatUIProps) {
   );
 
   const handleEnemySelect = useCallback((enemyId: string) => {
-    setSelectedTarget((prev) => (prev === enemyId ? null : enemyId));
+    console.log('[CombatUI] handleEnemySelect called with:', enemyId);
+    setSelectedTarget((prev) => {
+      const newTarget = prev === enemyId ? null : enemyId;
+      console.log('[CombatUI] selectedTarget changing from', prev, 'to', newTarget);
+      return newTarget;
+    });
   }, []);
 
   // Get HP color based on percentage
@@ -58,15 +72,24 @@ export function CombatUI({ combat, onAction, isLoading }: CombatUIProps) {
 
         {/* Enemy pills - compact inline */}
         <div className="flex gap-1 flex-wrap flex-1">
-          {combat.enemies.map((enemy) => (
-            <EnemyCard
-              key={enemy.id || enemy.name}
-              enemy={enemy}
-              isSelected={effectiveTarget === enemy.id}
-              onSelect={() => enemy.id && handleEnemySelect(enemy.id)}
-              selectable={enemy.id ? combat.valid_targets.includes(enemy.id) : false}
-            />
-          ))}
+          {combat.enemies.map((enemy) => {
+            const isSelectable = enemy.id ? combat.valid_targets.includes(enemy.id) : false;
+            console.log('[CombatUI] rendering enemy', enemy.name, 'id:', enemy.id, 'selectable:', isSelectable);
+            return (
+              <EnemyCard
+                key={enemy.id || enemy.name}
+                enemy={enemy}
+                isSelected={effectiveTarget === enemy.id}
+                onSelect={() => {
+                  console.log('[CombatUI] onSelect callback triggered for', enemy.name, enemy.id);
+                  if (enemy.id) {
+                    handleEnemySelect(enemy.id);
+                  }
+                }}
+                selectable={isSelectable}
+              />
+            );
+          })}
         </div>
 
         {/* HP */}

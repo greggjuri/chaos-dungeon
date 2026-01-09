@@ -27,6 +27,12 @@ PROMPT_LEAK_PATTERNS = [
     r"^\d+\.\s+\w+\s+(hits|misses|strikes|kills|crits|fumbles).*\(\d+\s*(damage|HP).*\).*$",
     r".*\(\w+\s+has\s+\d+\s+HP\s+remaining\).*$",
     r"^.*dealing\s+\d+\s+damage.*$",
+    # Output format artifacts
+    r"^Narrative:?\s*$",
+    r"^State Changes:?\s*$",
+    r"^```.*$",
+    r"^---+$",
+    r"^\*\*.*\*\*:?\s*$",  # Markdown bold headers
 ]
 
 

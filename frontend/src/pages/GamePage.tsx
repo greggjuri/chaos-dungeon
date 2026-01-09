@@ -123,12 +123,13 @@ export function GamePage() {
         <DeathScreen character={character} snapshot={characterSnapshot} />
       )}
 
-      {/* Action input - shown when NOT in turn-based combat and NOT dead */}
-      {!characterDead && (!combat || !combat.active) && (
+      {/* Action input - always shown when not dead (can type during combat too) */}
+      {!characterDead && (
         <ActionInput
           onSend={sendAction}
           disabled={sessionEnded}
           isLoading={isSendingAction}
+          placeholder={combat?.active ? 'Type action or use buttons above...' : 'What do you do?'}
         />
       )}
 

@@ -233,6 +233,11 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
 
         // Check for death/session end
         if (response.character_dead) {
+          console.log('[useGameSession] Character died! Response:', {
+            narrative: response.narrative,
+            dice_rolls: response.dice_rolls,
+            character_dead: response.character_dead
+          });
           setCharacterDead(true);
           setSessionEnded(true);
         } else if (response.session_ended) {

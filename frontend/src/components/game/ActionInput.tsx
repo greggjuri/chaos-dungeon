@@ -7,6 +7,7 @@ interface Props {
   onSend: (action: string) => void;
   disabled?: boolean;
   isLoading?: boolean;
+  placeholder?: string;
 }
 
 const MAX_LENGTH = 500;
@@ -15,7 +16,7 @@ const MAX_LENGTH = 500;
  * Text input for player actions.
  * Enter submits, Shift+Enter adds newline.
  */
-export function ActionInput({ onSend, disabled = false, isLoading = false }: Props) {
+export function ActionInput({ onSend, disabled = false, isLoading = false, placeholder }: Props) {
   const [value, setValue] = useState('');
 
   const handleSubmit = useCallback(() => {
@@ -49,7 +50,7 @@ export function ActionInput({ onSend, disabled = false, isLoading = false }: Pro
           placeholder={
             disabled
               ? 'Session has ended'
-              : "What do you do? (Enter to send, Shift+Enter for newline)"
+              : placeholder || "What do you do? (Enter to send, Shift+Enter for newline)"
           }
           disabled={isDisabled}
           rows={2}

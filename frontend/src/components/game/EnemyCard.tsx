@@ -31,11 +31,19 @@ export function EnemyCard({ enemy, isSelected, onSelect, selectable }: EnemyCard
     return 'text-red-400';
   };
 
-  const handleClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleClick = () => {
+    console.log('[EnemyCard] clicked', {
+      enemyId: enemy.id,
+      enemyName: enemy.name,
+      selectable,
+      isDead,
+      isSelected
+    });
     if (selectable && !isDead) {
+      console.log('[EnemyCard] calling onSelect');
       onSelect();
+    } else {
+      console.log('[EnemyCard] NOT calling onSelect - selectable:', selectable, 'isDead:', isDead);
     }
   };
 
@@ -43,7 +51,6 @@ export function EnemyCard({ enemy, isSelected, onSelect, selectable }: EnemyCard
     <button
       type="button"
       onClick={handleClick}
-      disabled={!selectable || isDead}
       className={`
         inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs
         transition-all select-none
