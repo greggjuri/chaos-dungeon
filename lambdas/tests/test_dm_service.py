@@ -470,6 +470,73 @@ class TestProcessAction:
         assert "SESS#" in sess_call.args[1]
 
 
+class TestCombatDeath:
+    """Tests for character death in turn-based combat."""
+
+    def test_combat_death_includes_dice_rolls(self, service, mock_db, sample_session, sample_character):
+        """Combat death response should include dice_rolls from attack results."""
+        # Set up combat state
+        sample_character["hp"] = 1  # Low HP to guarantee death
+        sample_session["combat_state"] = {
+            "active": True,
+            "round": 1,
+            "phase": "player_turn",
+            "player_initiative": 10,
+            "enemy_initiative": 15,
+            "player_defending": False,
+            "combat_log": [],
+        }
+        sample_session["combat_enemies"] = [
+            {
+                "id": "goblin-1",
+                "name": "Goblin",
+                "hp": 5,
+                "max_hp": 5,
+                "ac": 12,
+                "attack_bonus": 2,
+                "damage_dice": "1d6",
+                "xp_value": 25,
+            }
+        ]
+        mock_db.get_item.side_effect = [sample_session, sample_character]
+
+        # Mock AI narrative response
+        service._ai_client = MagicMock()
+        service._ai_client.narrate_combat.return_value = MistralResponse(
+            text="The goblin strikes you down!",
+            input_tokens=20,
+            output_tokens=10,
+        )
+
+        # Process combat action - attacking will trigger enemy counterattack
+        from dm.models import CombatAction, CombatActionType
+        result = service.process_action(
+            session_id="sess-123",
+            user_id="user-123",
+            action="I attack the goblin",
+            combat_action=CombatAction(action_type=CombatActionType.ATTACK, target_id="goblin-1"),
+        )
+
+        # Character should be dead
+        assert result.character_dead is True
+        assert result.session_ended is True
+
+        # dice_rolls should be populated with attack results
+        assert result.dice_rolls is not None
+        assert len(result.dice_rolls) > 0, "dice_rolls should contain attack rolls"
+
+        # Check we have attack type dice rolls
+        attack_rolls = [r for r in result.dice_rolls if r.type == "attack"]
+        assert len(attack_rolls) > 0, "Should have at least one attack roll"
+
+        # Verify attack roll structure
+        for roll in attack_rolls:
+            assert roll.roll >= 1, "Roll should be at least 1"
+            assert roll.roll <= 20, "Roll should be at most 20"
+            assert roll.attacker is not None, "Attacker should be set"
+            assert roll.target is not None, "Target should be set"
+
+
 class TestGetAIClient:
     """Tests for lazy AI client initialization."""
 
