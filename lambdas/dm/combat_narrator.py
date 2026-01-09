@@ -35,6 +35,15 @@ PROMPT_LEAK_PATTERNS = [
     r"^\*\*.*\*\*:?\s*$",  # Markdown bold headers
 ]
 
+# Patterns to clean from within narrative text (not line-based)
+HP_LEAK_PATTERNS = [
+    r"\s*\(?\d+\s*HP\s*(remaining|left)?\)?\.?",  # "(15 HP remaining)"
+    r"\s*\(?remaining\s+health\s+(now\s+)?at\s+\d+\)?\.?",  # "remaining health now at 15"
+    r"\s*\(?health\s*:\s*\d+\)?\.?",  # "health: 15"
+    r"\s*\(?\w+\s+has\s+\d+\s*(HP|health|hit\s*points?)\s*(remaining|left)?\)?\.?",  # "Goblin has 5 HP"
+    r"\s*\(?now\s+at\s+\d+\s*(HP|health)\)?\.?",  # "now at 15 HP"
+]
+
 
 def clean_narrator_output(text: str) -> str:
     """Clean AI output by removing any prompt leakage.
@@ -69,12 +78,24 @@ def clean_narrator_output(text: str) -> str:
 
     result = " ".join(cleaned_lines)
 
+    # Clean HP/health leaks from within the text
+    for pattern in HP_LEAK_PATTERNS:
+        original = result
+        result = re.sub(pattern, "", result, flags=re.IGNORECASE)
+        if result != original:
+            logger.warning(f"Cleaned HP leak with pattern: {pattern[:30]}...")
+
+    # Clean up any double spaces or awkward punctuation from removal
+    result = re.sub(r"\s{2,}", " ", result)  # Multiple spaces to single
+    result = re.sub(r"\s+([.,!?])", r"\1", result)  # Space before punctuation
+    result = re.sub(r"([.,!?])\s*([.,!?])", r"\1", result)  # Double punctuation
+
     # If we stripped everything, return a fallback
     if not result.strip():
         logger.warning("All output was prompt leakage, using fallback")
         return ""
 
-    return result
+    return result.strip()
 
 
 COMBAT_NARRATOR_SYSTEM_PROMPT = """You are a combat narrator for a dark fantasy RPG. Describe combat outcomes vividly.
@@ -82,6 +103,7 @@ COMBAT_NARRATOR_SYSTEM_PROMPT = """You are a combat narrator for a dark fantasy 
 RULES:
 - Output ONLY narrative prose. No meta-commentary, no instructions, no "Player action:" prefixes.
 - Describe exactly what is given - do not invent extra party members or attacks.
+- NEVER mention HP, health points, damage numbers, or remaining health. NO NUMBERS.
 - No dice numbers or game mechanics in output.
 - 1-2 vivid sentences per action. Brutal, visceral style.
 - Describe deaths dramatically.

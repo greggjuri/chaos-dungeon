@@ -353,6 +353,22 @@ class DMService:
             character, combat_enemies
         )
         if combat_ended and not player_won:
+            logger.info(
+                "Player death detected",
+                extra={
+                    "attack_results_count": len(attack_results),
+                    "attack_results": [
+                        {
+                            "attacker": a.attacker,
+                            "defender": a.defender,
+                            "damage": a.damage,
+                            "is_hit": a.is_hit,
+                        }
+                        for a in attack_results
+                    ],
+                    "character_hp": character["hp"],
+                },
+            )
             narrative = self._generate_combat_narrative(
                 attack_results, character["name"], session_id
             ) if attack_results else "You have fallen in battle."
@@ -539,7 +555,19 @@ class DMService:
         ]
 
         # Build dice rolls from attack results (includes the killing blow)
+        logger.debug(
+            "Building dice rolls for combat end",
+            extra={
+                "attack_results_received": attack_results is not None,
+                "attack_results_count": len(attack_results) if attack_results else 0,
+                "died": died,
+            },
+        )
         dice_rolls = self._build_combat_dice_rolls_from_list(attack_results or [])
+        logger.debug(
+            "Built dice rolls",
+            extra={"dice_rolls_count": len(dice_rolls)},
+        )
 
         return ActionResponse(
             narrative=narrative,
@@ -606,10 +634,20 @@ class DMService:
 
         # Get living enemies for response
         living_enemies = [e for e in combat_enemies if e.hp > 0]
-        response_enemies = [
-            Enemy(id=e.id, name=e.name, hp=e.hp, ac=e.ac, max_hp=e.max_hp)
-            for e in living_enemies
-        ]
+        response_enemies = []
+        for e in living_enemies:
+            enemy_id = e.id
+            if not enemy_id:
+                # Generate ID if missing (shouldn't happen)
+                enemy_id = str(uuid4())
+                logger.warning(f"Combat enemy {e.name} missing ID, generated: {enemy_id}")
+            response_enemies.append(
+                Enemy(id=enemy_id, name=e.name, hp=e.hp, ac=e.ac, max_hp=e.max_hp)
+            )
+        logger.debug(
+            "Built combat response enemies",
+            extra={"enemies": [{"id": e.id, "name": e.name} for e in response_enemies]},
+        )
 
         # Build available actions
         available_actions = [
@@ -833,16 +871,28 @@ class DMService:
         # Get enemies from session if combat is active, otherwise from Claude's response
         if is_combat_active:
             combat_enemies_data = session.get("combat_enemies", [])
-            response_enemies = [
-                Enemy(
-                    id=e.get("id"),
-                    name=e["name"],
-                    hp=e["hp"],
-                    ac=e["ac"],
-                    max_hp=e.get("max_hp", e["hp"]),
+            response_enemies = []
+            for e in combat_enemies_data:
+                enemy_id = e.get("id")
+                if not enemy_id:
+                    # Generate ID if missing (shouldn't happen but safety net)
+                    enemy_id = str(uuid4())
+                    logger.warning(f"Enemy {e.get('name')} missing ID, generated: {enemy_id}")
+                response_enemies.append(
+                    Enemy(
+                        id=enemy_id,
+                        name=e["name"],
+                        hp=e["hp"],
+                        ac=e["ac"],
+                        max_hp=e.get("max_hp", e["hp"]),
+                    )
                 )
-                for e in combat_enemies_data
-            ]
+            logger.debug(
+                "Built response_enemies from session",
+                extra={
+                    "enemies": [{"id": e.id, "name": e.name} for e in response_enemies],
+                },
+            )
         else:
             response_enemies = dm_response.enemies
 
@@ -960,6 +1010,9 @@ class DMService:
             "Combat initiated successfully",
             extra={
                 "enemies_count": len(combat_enemies),
+                "enemies_with_ids": [
+                    {"id": e.get("id"), "name": e.get("name")} for e in combat_enemies
+                ],
                 "player_init": player_init,
                 "enemy_init": enemy_init,
                 "combat_state": session["combat_state"],

@@ -212,6 +212,56 @@ cd frontend && npm test
 cd frontend && npm run lint
 ```
 
+## Deployment
+
+**IMPORTANT: This project uses AWS (S3/CloudFront/Lambda). Ignore any global CLAUDE.md instructions about Hostinger/FTP - they do not apply here.**
+
+### Backend (Lambda + API Gateway)
+
+Deploy Lambda functions and API Gateway via CDK:
+
+```bash
+cd cdk
+source .venv/bin/activate
+cdk deploy --all --require-approval never
+```
+
+For production with custom domain:
+```bash
+cdk deploy --all -c environment=prod -c certificateArn=<ACM_CERTIFICATE_ARN>
+```
+
+### Frontend (S3 + CloudFront)
+
+The frontend is hosted on S3 with CloudFront CDN at **chaos.jurigregg.com**.
+
+```bash
+# 1. Build the frontend
+cd frontend
+npm run build
+
+# 2. Sync to S3
+aws s3 sync dist/ s3://chaos-prod-frontend/ --delete
+
+# 3. Invalidate CloudFront cache
+aws cloudfront create-invalidation --distribution-id ELM5U8EYV81MH --paths "/*"
+```
+
+### Version Bumping
+
+- Update version in `frontend/package.json` before deploying
+- Use semantic versioning (e.g., 0.12.4 → 0.12.5 for bug fixes)
+- Current version is visible in the UI footer (bottom-right)
+
+### Quick Deploy Checklist
+
+1. Run tests: `cd lambdas && .venv/bin/pytest` and `cd frontend && npm test`
+2. Bump version in `frontend/package.json`
+3. Deploy backend: `cd cdk && cdk deploy --all`
+4. Build frontend: `cd frontend && npm run build`
+5. Deploy frontend: `aws s3 sync dist/ s3://chaos-prod-frontend/ --delete`
+6. Invalidate cache: `aws cloudfront create-invalidation --distribution-id ELM5U8EYV81MH --paths "/*"`
+
 ## Error Handling
 
 ### Python
