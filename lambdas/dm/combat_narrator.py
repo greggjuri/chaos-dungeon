@@ -33,6 +33,9 @@ PROMPT_LEAK_PATTERNS = [
     r"^```.*$",
     r"^---+$",
     r"^\*\*.*\*\*:?\s*$",  # Markdown bold headers
+    r"^\[Narrative\]:?\s*$",  # [Narrative] header
+    r"^\[JSON\]:?\s*$",  # [JSON] header
+    r"^\{.*\}$",  # JSON object on its own line
 ]
 
 # Patterns to clean from within narrative text (not line-based)
@@ -110,12 +113,17 @@ RULES:
 - Output the narrative directly with no preamble."""
 
 
-def build_narrator_prompt(attack_results: list[AttackResult], player_name: str) -> str:
+def build_narrator_prompt(
+    attack_results: list[AttackResult],
+    player_name: str,
+    outcome: str = "ongoing",
+) -> str:
     """Build a minimal prompt for the AI to narrate combat outcomes.
 
     Args:
         attack_results: List of resolved attacks to narrate
         player_name: Name of the player character
+        outcome: Combat outcome - "ongoing", "player_died", "victory", or "fled"
 
     Returns:
         Prompt string for the AI
@@ -142,7 +150,15 @@ def build_narrator_prompt(attack_results: list[AttackResult], player_name: str) 
             else:
                 lines.append(f"{actor} misses {target}")
 
-    return "Narrate: " + "; ".join(lines)
+    prompt = "Narrate: " + "; ".join(lines)
+
+    # Add explicit outcome instruction
+    if outcome == "player_died":
+        prompt += f"\n\nOUTCOME: {player_name} DIES. Narrate their dramatic death. Do NOT narrate escape or survival."
+    elif outcome == "victory":
+        prompt += "\n\nOUTCOME: All enemies defeated. Narrate the victory."
+
+    return prompt
 
 
 def build_defend_narrative() -> str:

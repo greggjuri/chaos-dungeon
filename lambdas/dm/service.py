@@ -325,7 +325,7 @@ class DMService:
             xp_gained = total_xp  # Award all XP on victory
             # Generate victory narrative
             narrative = self._generate_combat_narrative(
-                attack_results, character["name"], session_id
+                attack_results, character["name"], session_id, outcome="victory"
             ) if attack_results else "Victory! All enemies have been defeated."
             new_log_entries.extend(
                 build_combat_log_entries(attack_results, combat_state.round, character["name"])
@@ -370,7 +370,7 @@ class DMService:
                 },
             )
             narrative = self._generate_combat_narrative(
-                attack_results, character["name"], session_id
+                attack_results, character["name"], session_id, outcome="player_died"
             ) if attack_results else "You have fallen in battle."
             new_log_entries.extend(
                 build_combat_log_entries(attack_results, combat_state.round, character["name"])
@@ -422,7 +422,11 @@ class DMService:
         )
 
     def _generate_combat_narrative(
-        self, attack_results: list, player_name: str, session_id: str
+        self,
+        attack_results: list,
+        player_name: str,
+        session_id: str,
+        outcome: str = "ongoing",
     ) -> str:
         """Generate AI narrative for combat results.
 
@@ -430,6 +434,7 @@ class DMService:
             attack_results: List of AttackResult from combat
             player_name: Player character name
             session_id: For usage tracking
+            outcome: Combat outcome - "ongoing", "player_died", "victory"
 
         Returns:
             Narrative string
@@ -438,7 +443,7 @@ class DMService:
             return ""
 
         try:
-            prompt = build_narrator_prompt(attack_results, player_name)
+            prompt = build_narrator_prompt(attack_results, player_name, outcome)
             client = self._get_ai_client()
 
             # Use dedicated narrator method if available (Bedrock), otherwise fallback
