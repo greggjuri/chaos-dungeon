@@ -8,6 +8,7 @@ from dm.bestiary import (
     BESTIARY,
     get_enemy_template,
     list_enemy_types,
+    spawn_enemies,
     spawn_enemy,
 )
 from dm.models import CombatEnemy
@@ -192,3 +193,66 @@ class TestBestiaryCompleteness:
         """AC values should be in reasonable range."""
         for enemy_type, template in BESTIARY.items():
             assert 10 <= template["ac"] <= 25, f"{enemy_type} has unusual AC"
+
+
+class TestSpawnEnemies:
+    """Tests for spawn_enemies function (batch spawning with numbering)."""
+
+    def test_spawn_enemies_numbers_duplicates(self):
+        """Test that duplicate enemy types get numbered names."""
+        random.seed(42)
+        enemies = spawn_enemies(["goblin", "goblin", "goblin"])
+        names = [e.name for e in enemies]
+        assert names == ["Goblin 1", "Goblin 2", "Goblin 3"]
+
+    def test_spawn_enemies_no_number_for_singles(self):
+        """Test that single enemy types don't get numbered."""
+        random.seed(42)
+        enemies = spawn_enemies(["goblin", "orc", "skeleton"])
+        names = [e.name for e in enemies]
+        assert names == ["Goblin", "Orc", "Skeleton"]
+
+    def test_spawn_enemies_mixed_numbering(self):
+        """Test mixed duplicates and singles."""
+        random.seed(42)
+        enemies = spawn_enemies(["goblin", "orc", "goblin"])
+        names = [e.name for e in enemies]
+        assert names == ["Goblin 1", "Orc", "Goblin 2"]
+
+    def test_spawn_enemies_empty_list(self):
+        """Empty list returns empty list."""
+        enemies = spawn_enemies([])
+        assert enemies == []
+
+    def test_spawn_enemies_unique_ids(self):
+        """All spawned enemies should have unique IDs."""
+        enemies = spawn_enemies(["goblin", "goblin", "orc", "orc"])
+        ids = [e.id for e in enemies]
+        assert len(ids) == len(set(ids))
+
+    def test_spawn_enemies_unknown_raises(self):
+        """Unknown enemy type should raise ValueError."""
+        with pytest.raises(ValueError):
+            spawn_enemies(["goblin", "unknown_monster"])
+
+
+class TestSpawnEnemyWithIndex:
+    """Tests for spawn_enemy with index parameter."""
+
+    def test_spawn_with_index(self):
+        """Enemy should have numbered name when index provided."""
+        random.seed(42)
+        enemy = spawn_enemy("goblin", index=1)
+        assert enemy.name == "Goblin 1"
+
+    def test_spawn_without_index(self):
+        """Enemy should have base name when no index."""
+        random.seed(42)
+        enemy = spawn_enemy("goblin")
+        assert enemy.name == "Goblin"
+
+    def test_spawn_with_various_indices(self):
+        """Various indices should work correctly."""
+        for i in [1, 2, 10, 99]:
+            enemy = spawn_enemy("orc", index=i)
+            assert enemy.name == f"Orc {i}"

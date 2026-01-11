@@ -170,6 +170,6 @@ class BedrockClient:
 
         return self.invoke_mistral(
             prompt=prompt,
-            max_tokens=200,  # Short narrative only
+            max_tokens=300,  # Allow complete sentences
             temperature=0.7,  # Slightly more focused
         )

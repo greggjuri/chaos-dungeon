@@ -4,6 +4,7 @@
 
 ### In Progress
 - [ ] prp-12-turn-based-combat.md - Integration testing in browser (deployed, needs manual verification)
+- [x] prp-14-combat-polish.md - Combat narrator cleanup, enemy numbering, target parsing
 
 ### To Do (Phase 2 - Core Game Loop)
 - [x] init-06-action-handler.md - Process player actions
@@ -62,4 +63,4 @@ None currently.
 
 ---
 
-*Last updated: 2026-01-08 (prp-12 turn-based combat implementation)*
+*Last updated: 2026-01-11 (prp-14 combat polish implementation)*

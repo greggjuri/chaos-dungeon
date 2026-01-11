@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import anthropic
 import pytest
 
-from dm.models import ActionResponse, CharacterSnapshot, DiceRoll, Enemy, StateChanges
+from dm.models import ActionResponse, CharacterSnapshot, DiceRoll, StateChanges
 from shared.cost_guard import LimitStatus
 
 

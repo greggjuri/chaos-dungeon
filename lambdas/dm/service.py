@@ -8,7 +8,7 @@ from uuid import uuid4
 from aws_lambda_powertools import Logger
 
 from dm.bedrock_client import MistralResponse
-from dm.bestiary import spawn_enemy
+from dm.bestiary import spawn_enemies
 from dm.combat import CombatResolver
 from dm.combat_narrator import (
     COMBAT_NARRATOR_SYSTEM_PROMPT,
@@ -965,6 +965,8 @@ class DMService:
     def _initiate_combat(self, session: dict, enemies: list[Enemy]) -> None:
         """Start combat with enemies from Claude's response.
 
+        Uses spawn_enemies to handle duplicate enemy types with numbered names.
+
         Args:
             session: Session dict to update
             enemies: Enemies from Claude's response
@@ -976,33 +978,68 @@ class DMService:
             },
         )
 
-        combat_enemies = []
+        # Collect enemies for spawning
+        known_enemies: list[dict] = []
+        unknown_enemies: list[Enemy] = []
+
+        # Separate known (bestiary) from unknown enemies
         for enemy in enemies:
-            try:
-                # Try to spawn from bestiary
-                spawned = spawn_enemy(enemy.name)
-                combat_enemies.append(spawned.model_dump())
+            from dm.bestiary import get_enemy_template
+
+            if get_enemy_template(enemy.name):
+                # Will be handled by spawn_enemies
+                pass
+            else:
+                unknown_enemies.append(enemy)
+
+        # Spawn known enemies with numbering
+        try:
+            known_types = [e.name for e in enemies if get_enemy_template(e.name)]
+            if known_types:
+                spawned = spawn_enemies(known_types)
+                known_enemies = [e.model_dump() for e in spawned]
                 logger.debug(
-                    "Spawned enemy from bestiary",
-                    extra={"enemy_name": enemy.name, "spawned": spawned.model_dump()},
+                    "Spawned enemies from bestiary with numbering",
+                    extra={"spawned": known_enemies},
                 )
-            except ValueError:
-                # Unknown enemy - use stats from Claude's response
-                fallback_enemy = {
-                    "id": str(uuid4()),
-                    "name": enemy.name,
-                    "hp": enemy.hp,
-                    "max_hp": enemy.max_hp or enemy.hp,
-                    "ac": enemy.ac,
-                    "attack_bonus": 1,
-                    "damage_dice": "1d6",
-                    "xp_value": max(10, enemy.hp * 2),
-                }
-                combat_enemies.append(fallback_enemy)
-                logger.debug(
-                    "Using Claude stats for unknown enemy",
-                    extra={"enemy_name": enemy.name, "fallback": fallback_enemy},
-                )
+        except ValueError as err:
+            logger.warning(f"Failed to spawn some enemies: {err}")
+
+        # Handle unknown enemies with fallback stats (add numbering manually)
+        unknown_type_counts: dict[str, int] = {}
+        unknown_type_indices: dict[str, int] = {}
+        for e in unknown_enemies:
+            normalized = e.name.lower().strip()
+            unknown_type_counts[normalized] = unknown_type_counts.get(normalized, 0) + 1
+
+        fallback_enemies: list[dict] = []
+        for enemy in unknown_enemies:
+            normalized = enemy.name.lower().strip()
+            count = unknown_type_counts[normalized]
+
+            name = enemy.name
+            if count > 1:
+                idx = unknown_type_indices.get(normalized, 0) + 1
+                unknown_type_indices[normalized] = idx
+                name = f"{enemy.name} {idx}"
+
+            fallback_enemy = {
+                "id": str(uuid4()),
+                "name": name,
+                "hp": enemy.hp,
+                "max_hp": enemy.max_hp or enemy.hp,
+                "ac": enemy.ac,
+                "attack_bonus": 1,
+                "damage_dice": "1d6",
+                "xp_value": max(10, enemy.hp * 2),
+            }
+            fallback_enemies.append(fallback_enemy)
+            logger.debug(
+                "Using Claude stats for unknown enemy",
+                extra={"enemy_name": enemy.name, "fallback": fallback_enemy},
+            )
+
+        combat_enemies = known_enemies + fallback_enemies
 
         # Roll initiative
         player_init, _ = roll_dice_notation("1d6")

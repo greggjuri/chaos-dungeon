@@ -142,43 +142,47 @@ def _contains_any(text: str, keywords: list[str]) -> bool:
 
 
 def _find_target(text: str, enemies: list[CombatEnemy]) -> CombatEnemy | None:
-    """Find which enemy is being targeted in the text.
+    """Find target enemy from player's text input.
 
-    Uses fuzzy matching on enemy names.
+    Matching priority:
+    1. Full name match (case-insensitive): "Goblin 1" matches "Goblin 1"
+    2. First word match: "goblin" matches "Goblin 1" (first living match)
+    3. Numbered suffix: "2" matches enemy with " 2" suffix
+
+    If multiple enemies match (e.g., "attack goblin" with Goblin 1 and Goblin 2),
+    returns the FIRST living enemy in list order.
 
     Args:
-        text: Normalized text containing target reference
-        enemies: List of enemies to match against
+        text: Player's input text
+        enemies: List of enemies in combat
 
     Returns:
-        Matched enemy or None
+        First matching living enemy, or None
     """
+    text_lower = text.lower().strip()
     living_enemies = [e for e in enemies if e.hp > 0]
 
+    if not living_enemies:
+        return None
+
+    # 1. Full name match (exact or contained in text)
     for enemy in living_enemies:
-        enemy_name_lower = enemy.name.lower()
-
-        # Direct match on enemy name
-        if enemy_name_lower in text:
+        if enemy.name.lower() == text_lower or enemy.name.lower() in text_lower:
             return enemy
 
-        # Match on first word of enemy name (e.g., "goblin" matches "Goblin Warrior")
-        first_word = enemy_name_lower.split()[0] if enemy_name_lower else ""
-        if first_word and first_word in text:
-            return enemy
+    # 2. First word match (e.g., "goblin" matches "Goblin 1")
+    for enemy in living_enemies:
+        first_word = enemy.name.split()[0].lower()
+        if first_word in text_lower:
+            return enemy  # Return FIRST match
 
-        # Match on enemy ID if mentioned (e.g., "attack goblin_a")
-        if enemy.id and enemy.id.lower() in text:
-            return enemy
-
-        # Try matching letter suffix (e.g., "attack a" or "attack the first one")
-        # Extract letter suffix if enemy ID ends with _a, _b, etc.
-        if enemy.id:
-            id_match = re.search(r"_([a-z])$", enemy.id.lower())
-            if id_match:
-                letter = id_match.group(1)
-                # Check for patterns like "attack a" or "the [letter] one"
-                if re.search(rf"\b{letter}\b", text):
-                    return enemy
+    # 3. Numbered suffix match (e.g., "attack 2" targets enemy with " 2" suffix)
+    # Use exact suffix match to avoid "1" matching "Goblin 11"
+    match = re.search(r"\b(\d+)\b", text)
+    if match:
+        num = match.group(1)
+        for enemy in living_enemies:
+            if enemy.name.endswith(f" {num}"):
+                return enemy
 
     return None

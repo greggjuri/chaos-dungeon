@@ -36,6 +36,11 @@ PROMPT_LEAK_PATTERNS = [
     r"^\[Narrative\]:?\s*$",  # [Narrative] header
     r"^\[JSON\]:?\s*$",  # [JSON] header
     r"^\{.*\}$",  # JSON object on its own line
+    # DM/Dungeon Master prefixes
+    r"^\[DM\]:?\s*$",  # [DM] or [DM]: header
+    r"^\[Dungeon Master\]:?\s*$",
+    r"^DM:\s*$",
+    r"^Dungeon Master:\s*$",
 ]
 
 # Patterns to clean from within narrative text (not line-based)
@@ -53,6 +58,11 @@ INLINE_MARKERS = [
     r"\[JSON\]:?\s*",  # [JSON] or [JSON]: prefix
     r"\[Output\]:?\s*",  # [Output] prefix
     r"^Narrative:\s*",  # Narrative: prefix at start
+    # DM prefixes (no ^ anchor - match anywhere)
+    r"\[DM\]:?\s*",  # [DM]: inline prefix
+    r"\[Dungeon Master\]:?\s*",
+    r"DM:\s*",
+    r"Dungeon Master:\s*",
 ]
 
 
@@ -118,14 +128,17 @@ def clean_narrator_output(text: str) -> str:
 
 COMBAT_NARRATOR_SYSTEM_PROMPT = """You are a combat narrator for a dark fantasy RPG. Describe combat outcomes vividly.
 
-RULES:
-- Output ONLY narrative prose. No meta-commentary, no instructions, no "Player action:" prefixes.
-- Describe exactly what is given - do not invent extra party members or attacks.
-- NEVER mention HP, health points, damage numbers, or remaining health. NO NUMBERS.
-- No dice numbers or game mechanics in output.
-- 1-2 vivid sentences per action. Brutal, visceral style.
-- Describe deaths dramatically.
-- Output the narrative directly with no preamble."""
+CRITICAL RULES:
+1. Output ONLY narrative prose. No headers, no markers, no meta-commentary.
+2. Describe EXACTLY what is given. The combatants are:
+   - The player character (named in the prompt)
+   - The enemies listed in the prompt
+   NO OTHER CHARACTERS EXIST. Do not invent party members, allies, or bystanders.
+3. NEVER mention HP, damage numbers, or game mechanics. NO NUMBERS.
+4. 1-2 vivid sentences per action. Brutal, visceral style.
+5. Describe deaths dramatically when indicated.
+6. Complete your sentences. Never stop mid-word.
+7. Output the narrative directly with no preamble or conclusion."""
 
 
 def build_narrator_prompt(

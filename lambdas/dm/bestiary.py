@@ -156,7 +156,7 @@ BESTIARY: dict[str, dict] = {
 }
 
 
-def spawn_enemy(enemy_type: str) -> CombatEnemy:
+def spawn_enemy(enemy_type: str, index: int | None = None) -> CombatEnemy:
     """Create an enemy instance with rolled HP.
 
     Looks up the enemy type in the bestiary and creates a
@@ -164,6 +164,8 @@ def spawn_enemy(enemy_type: str) -> CombatEnemy:
 
     Args:
         enemy_type: Name of the enemy type (case-insensitive)
+        index: Optional 1-based index for disambiguation (e.g., 1, 2, 3)
+            When provided, name becomes "Goblin 1", "Goblin 2", etc.
 
     Returns:
         CombatEnemy instance ready for combat
@@ -182,9 +184,14 @@ def spawn_enemy(enemy_type: str) -> CombatEnemy:
     hp, _ = roll(template["hp_dice"])
     hp = max(1, hp)  # Minimum 1 HP
 
+    # Add index to name if provided (for multiple enemies of same type)
+    name = template["name"]
+    if index is not None:
+        name = f"{name} {index}"
+
     return CombatEnemy(
         id=str(uuid4()),
-        name=template["name"],
+        name=name,
         hp=hp,
         max_hp=hp,
         ac=template["ac"],
@@ -192,6 +199,48 @@ def spawn_enemy(enemy_type: str) -> CombatEnemy:
         damage_dice=template["damage_dice"],
         xp_value=template["xp_value"],
     )
+
+
+def spawn_enemies(enemy_types: list[str]) -> list[CombatEnemy]:
+    """Spawn multiple enemies with numbered names for duplicates.
+
+    When multiple enemies of the same type are spawned, they get
+    numbered names for disambiguation (e.g., "Goblin 1", "Goblin 2").
+    Single enemies of a type keep their base name (e.g., "Goblin").
+
+    Args:
+        enemy_types: List of enemy type names
+
+    Returns:
+        List of CombatEnemy with numbered names for duplicates
+
+    Raises:
+        ValueError: If any enemy type is not in the bestiary
+    """
+    # Count occurrences of each type
+    type_counts: dict[str, int] = {}
+    for t in enemy_types:
+        normalized = t.lower().strip()
+        type_counts[normalized] = type_counts.get(normalized, 0) + 1
+
+    # Track which index we're on for each type
+    type_indices: dict[str, int] = {}
+    enemies = []
+
+    for enemy_type in enemy_types:
+        normalized = enemy_type.lower().strip()
+        count = type_counts[normalized]
+
+        if count > 1:
+            # Multiple of this type - add index
+            idx = type_indices.get(normalized, 0) + 1
+            type_indices[normalized] = idx
+            enemies.append(spawn_enemy(enemy_type, index=idx))
+        else:
+            # Only one of this type - no index needed
+            enemies.append(spawn_enemy(enemy_type))
+
+    return enemies
 
 
 def get_enemy_template(enemy_type: str) -> dict | None:

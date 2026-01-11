@@ -466,3 +466,119 @@ class TestCombatEdgeCases:
         assert result.combat_ended is True
         assert len(result.attack_results) == 0
         assert result.xp_gained == 0
+
+
+class TestCombatNarratorCleaning:
+    """Tests for combat narrator output cleaning."""
+
+    def test_clean_narrator_output_strips_dm_prefix(self):
+        """Test that [DM]: prefix is stripped."""
+        from dm.combat_narrator import clean_narrator_output
+
+        text = "[DM]: The goblin strikes!"
+        result = clean_narrator_output(text)
+        assert result == "The goblin strikes!"
+
+    def test_clean_narrator_output_strips_dungeon_master(self):
+        """Test that Dungeon Master: prefix is stripped."""
+        from dm.combat_narrator import clean_narrator_output
+
+        text = "Dungeon Master: The blade finds its mark."
+        result = clean_narrator_output(text)
+        assert result == "The blade finds its mark."
+
+    def test_clean_narrator_output_strips_dm_header_line(self):
+        """Test that standalone DM: line is removed."""
+        from dm.combat_narrator import clean_narrator_output
+
+        text = "DM:\nThe goblin lunges forward."
+        result = clean_narrator_output(text)
+        assert result == "The goblin lunges forward."
+
+    def test_clean_narrator_output_strips_state_changes_header(self):
+        """Test that State Changes: line is removed."""
+        from dm.combat_narrator import clean_narrator_output
+
+        text = "You strike the goblin.\nState Changes:\nThe battle continues."
+        result = clean_narrator_output(text)
+        assert "State Changes" not in result
+        assert "You strike the goblin" in result
+
+    def test_clean_narrator_output_strips_inline_dm(self):
+        """Test that inline [DM]: markers are stripped."""
+        from dm.combat_narrator import clean_narrator_output
+
+        text = "The orc falls. [DM]: Combat ends."
+        result = clean_narrator_output(text)
+        assert "[DM]" not in result
+
+    def test_clean_narrator_output_strips_hp_mentions(self):
+        """Test that HP values are stripped from output."""
+        from dm.combat_narrator import clean_narrator_output
+
+        text = "The goblin is wounded (5 HP remaining)."
+        result = clean_narrator_output(text)
+        assert "HP" not in result
+        assert "5" not in result
+
+
+class TestCombatParserTargeting:
+    """Tests for combat parser target selection with numbered enemies."""
+
+    def test_find_target_first_match_for_ambiguous(self):
+        """Test that ambiguous type matches first living enemy."""
+        from dm.combat_parser import _find_target
+
+        enemies = [
+            CombatEnemy(id="1", name="Goblin 1", hp=4, max_hp=4, ac=12),
+            CombatEnemy(id="2", name="Goblin 2", hp=4, max_hp=4, ac=12),
+        ]
+        result = _find_target("attack goblin", enemies)
+        assert result is not None
+        assert result.name == "Goblin 1"
+
+    def test_find_target_specific_number(self):
+        """Test that numbered suffix targets specific enemy."""
+        from dm.combat_parser import _find_target
+
+        enemies = [
+            CombatEnemy(id="1", name="Goblin 1", hp=4, max_hp=4, ac=12),
+            CombatEnemy(id="2", name="Goblin 2", hp=4, max_hp=4, ac=12),
+        ]
+        result = _find_target("attack goblin 2", enemies)
+        assert result is not None
+        assert result.name == "Goblin 2"
+
+    def test_find_target_number_exact_suffix(self):
+        """Test that '1' doesn't match 'Goblin 11' (edge case)."""
+        from dm.combat_parser import _find_target
+
+        enemies = [
+            CombatEnemy(id="1", name="Goblin 1", hp=4, max_hp=4, ac=12),
+            CombatEnemy(id="11", name="Goblin 11", hp=4, max_hp=4, ac=12),
+        ]
+        result = _find_target("attack 1", enemies)
+        assert result is not None
+        assert result.name == "Goblin 1"  # Not Goblin 11
+
+    def test_find_target_skips_dead_enemies(self):
+        """Test that dead enemies are not targeted."""
+        from dm.combat_parser import _find_target
+
+        enemies = [
+            CombatEnemy(id="1", name="Goblin 1", hp=0, max_hp=4, ac=12),
+            CombatEnemy(id="2", name="Goblin 2", hp=4, max_hp=4, ac=12),
+        ]
+        result = _find_target("attack goblin", enemies)
+        assert result is not None
+        assert result.name == "Goblin 2"  # First living
+
+    def test_find_target_no_match_returns_none(self):
+        """Test that unmatched target returns None."""
+        from dm.combat_parser import _find_target
+
+        enemies = [
+            CombatEnemy(id="1", name="Goblin", hp=4, max_hp=4, ac=12),
+        ]
+        result = _find_target("attack orc", enemies)
+        assert result is None
