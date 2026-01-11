@@ -7,6 +7,7 @@ from typing import Any
 from aws_lambda_powertools import Logger
 from pydantic import ValidationError
 
+from .combat_narrator import clean_narrator_output
 from .models import DiceRoll, DMResponse, Enemy, StateChanges
 
 logger = Logger(child=True)
@@ -43,6 +44,8 @@ def parse_dm_response(response_text: str) -> DMResponse:
     if match:
         # Extract narrative (everything before the JSON block)
         narrative = response_text[: match.start()].strip()
+        # Clean artifacts from narrative
+        narrative = clean_narrator_output(narrative)
         json_str = match.group(1)
 
         try:
@@ -57,6 +60,8 @@ def parse_dm_response(response_text: str) -> DMResponse:
     raw_match = RAW_JSON_PATTERN.search(response_text)
     if raw_match:
         narrative = response_text[: raw_match.start()].strip()
+        # Clean artifacts from narrative
+        narrative = clean_narrator_output(narrative)
         json_str = raw_match.group()
 
         try:
@@ -69,7 +74,9 @@ def parse_dm_response(response_text: str) -> DMResponse:
 
     # Fallback: return narrative only with empty state changes
     logger.debug("No JSON found in response, using narrative only")
-    return DMResponse(narrative=response_text.strip())
+    # Clean artifacts from narrative
+    cleaned_narrative = clean_narrator_output(response_text.strip())
+    return DMResponse(narrative=cleaned_narrative or response_text.strip())
 
 
 def _build_response(narrative: str, data: dict[str, Any]) -> DMResponse:

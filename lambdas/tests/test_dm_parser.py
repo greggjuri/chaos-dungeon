@@ -268,6 +268,62 @@ Some text with {"state_changes": {"hp_delta": -5}} raw json"""
         # Should use the code block JSON, not the raw JSON
         assert result.state_changes.hp_delta == 10
 
+    def test_cleans_narrative_header_artifacts(self) -> None:
+        """Test that [Narrative] and [State Changes] headers are stripped."""
+        response = """[Narrative]
+The goblin attacks!
+
+[State Changes]
+
+```json
+{"state_changes": {}}
+```"""
+
+        result = parse_dm_response(response)
+
+        assert "[Narrative]" not in result.narrative
+        assert "[State Changes]" not in result.narrative
+        assert "goblin attacks" in result.narrative
+
+    def test_cleans_inline_markers(self) -> None:
+        """Test that inline markers like [Narrative]: are stripped."""
+        response = """[Narrative]: The tavern is quiet tonight.
+
+```json
+{"state_changes": {}}
+```"""
+
+        result = parse_dm_response(response)
+
+        assert "[Narrative]" not in result.narrative
+        assert "tavern is quiet" in result.narrative
+
+    def test_cleans_dm_prefix_from_narrative(self) -> None:
+        """Test that DM: and [DM]: prefixes are stripped."""
+        response = """DM: You enter the dark cave.
+
+```json
+{"state_changes": {"location": "Dark Cave"}}
+```"""
+
+        result = parse_dm_response(response)
+
+        assert "DM:" not in result.narrative
+        assert "enter the dark cave" in result.narrative
+
+    def test_cleans_fallback_narrative(self) -> None:
+        """Test that cleaning works even without JSON (fallback path)."""
+        response = """[Narrative]
+The merchant nods and hands you the sword.
+[State Changes]
+Nothing to report."""
+
+        result = parse_dm_response(response)
+
+        assert "[Narrative]" not in result.narrative
+        assert "[State Changes]" not in result.narrative
+        assert "merchant nods" in result.narrative
+
 
 class TestStateChangesModel:
     """Tests for StateChanges model."""

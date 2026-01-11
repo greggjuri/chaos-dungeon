@@ -29,11 +29,12 @@ PROMPT_LEAK_PATTERNS = [
     r"^.*dealing\s+\d+\s+damage.*$",
     # Output format artifacts
     r"^Narrative:?\s*$",
+    r"^\[Narrative\]:?\s*$",  # [Narrative] header line
     r"^State Changes:?\s*$",
+    r"^\[State Changes\]:?\s*$",  # [State Changes] header line
     r"^```.*$",
     r"^---+$",
     r"^\*\*.*\*\*:?\s*$",  # Markdown bold headers
-    r"^\[Narrative\]:?\s*$",  # [Narrative] header
     r"^\[JSON\]:?\s*$",  # [JSON] header
     r"^\{.*\}$",  # JSON object on its own line
     # DM/Dungeon Master prefixes
@@ -55,9 +56,11 @@ HP_LEAK_PATTERNS = [
 # Inline markers to strip (not line-based - can appear anywhere)
 INLINE_MARKERS = [
     r"\[Narrative\]:?\s*",  # [Narrative] or [Narrative]: prefix
+    r"\[State Changes\]:?\s*",  # [State Changes] prefix
     r"\[JSON\]:?\s*",  # [JSON] or [JSON]: prefix
     r"\[Output\]:?\s*",  # [Output] prefix
-    r"^Narrative:\s*",  # Narrative: prefix at start
+    r"Narrative:\s*",  # Narrative: prefix (no ^ - match anywhere)
+    r"State Changes:\s*",  # State Changes: prefix
     # DM prefixes (no ^ anchor - match anywhere)
     r"\[DM\]:?\s*",  # [DM]: inline prefix
     r"\[Dungeon Master\]:?\s*",
