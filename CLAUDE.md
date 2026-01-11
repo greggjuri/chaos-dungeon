@@ -269,11 +269,14 @@ aws s3 sync dist/ s3://chaos-prod-frontend/ --delete
 aws cloudfront create-invalidation --distribution-id ELM5U8EYV81MH --paths "/*"
 ```
 
-### Version Bumping
+### Version Bumping - MANDATORY
+
+**ALWAYS bump the version for EVERY deployment, no matter how small.** This applies to both backend-only and frontend changes.
 
 - Update version in `frontend/package.json` before deploying
 - Use semantic versioning (e.g., 0.12.4 → 0.12.5 for bug fixes)
 - Current version is visible in the UI footer (bottom-right)
+- After bumping: rebuild frontend, deploy to S3, invalidate CloudFront, commit the version bump
 
 ### Quick Deploy Checklist (PROD)
 
@@ -288,6 +291,7 @@ aws cloudfront create-invalidation --distribution-id ELM5U8EYV81MH --paths "/*"
 4. Build frontend: `cd frontend && npm run build`
 5. Deploy frontend: `aws s3 sync dist/ s3://chaos-prod-frontend/ --delete`
 6. Invalidate cache: `aws cloudfront create-invalidation --distribution-id ELM5U8EYV81MH --paths "/*"`
+7. Commit version bump: `git add frontend/package.json && git commit -m "chore: bump version to X.Y.Z" && git push`
 
 ### Verify Deployment
 
