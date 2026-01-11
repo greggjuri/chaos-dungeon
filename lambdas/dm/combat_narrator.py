@@ -42,6 +42,8 @@ PROMPT_LEAK_PATTERNS = [
     r"^\[Dungeon Master\]:?\s*$",
     r"^DM:\s*$",
     r"^Dungeon Master:\s*$",
+    # Part headers (Mistral sometimes outputs "Part 1: Narrative")
+    r"^Part\s*\d+:?\s*(Narrative|State Changes?)?\s*$",
 ]
 
 # Patterns to clean from within narrative text (not line-based)
@@ -66,6 +68,8 @@ INLINE_MARKERS = [
     r"\[Dungeon Master\]:?\s*",
     r"DM:\s*",
     r"Dungeon Master:\s*",
+    # Part headers inline
+    r"Part\s*\d+:?\s*(Narrative|State Changes?)?\s*",
 ]
 
 
