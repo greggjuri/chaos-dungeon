@@ -325,7 +325,7 @@ class DMService:
             xp_gained = total_xp  # Award all XP on victory
             # Generate victory narrative
             narrative = self._generate_combat_narrative(
-                attack_results, character["name"], session_id, outcome="victory"
+                attack_results, character["name"], combat_enemies, session_id, outcome="victory"
             ) if attack_results else "Victory! All enemies have been defeated."
             new_log_entries.extend(
                 build_combat_log_entries(attack_results, combat_state.round, character["name"])
@@ -370,7 +370,7 @@ class DMService:
                 },
             )
             narrative = self._generate_combat_narrative(
-                attack_results, character["name"], session_id, outcome="player_died"
+                attack_results, character["name"], combat_enemies, session_id, outcome="player_died"
             ) if attack_results else "You have fallen in battle."
             new_log_entries.extend(
                 build_combat_log_entries(attack_results, combat_state.round, character["name"])
@@ -390,7 +390,7 @@ class DMService:
         # ========== CONTINUE COMBAT ==========
         # Generate narrative for the round
         narrative = self._generate_combat_narrative(
-            attack_results, character["name"], session_id
+            attack_results, character["name"], combat_enemies, session_id
         ) if attack_results else (
             build_defend_narrative() if player_defending else "The combatants circle warily."
         )
@@ -425,6 +425,7 @@ class DMService:
         self,
         attack_results: list,
         player_name: str,
+        combat_enemies: list,
         session_id: str,
         outcome: str = "ongoing",
     ) -> str:
@@ -433,6 +434,7 @@ class DMService:
         Args:
             attack_results: List of AttackResult from combat
             player_name: Player character name
+            combat_enemies: List of CombatEnemy in combat
             session_id: For usage tracking
             outcome: Combat outcome - "ongoing", "player_died", "victory"
 
@@ -443,7 +445,7 @@ class DMService:
             return ""
 
         try:
-            prompt = build_narrator_prompt(attack_results, player_name, outcome)
+            prompt = build_narrator_prompt(player_name, combat_enemies, attack_results, outcome)
             client = self._get_ai_client()
 
             # Use dedicated narrator method if available (Bedrock), otherwise fallback

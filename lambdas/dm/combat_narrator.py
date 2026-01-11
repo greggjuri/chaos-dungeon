@@ -8,7 +8,7 @@ import re
 
 from aws_lambda_powertools import Logger
 
-from dm.models import AttackResult, CombatLogEntry
+from dm.models import AttackResult, CombatEnemy, CombatLogEntry
 
 logger = Logger(child=True)
 
@@ -129,38 +129,42 @@ def clean_narrator_output(text: str) -> str:
     return result.strip()
 
 
-COMBAT_NARRATOR_SYSTEM_PROMPT = """You are a combat narrator for a dark fantasy RPG. Describe combat outcomes vividly.
+COMBAT_NARRATOR_SYSTEM_PROMPT = """You narrate combat for a dark fantasy RPG.
 
-CRITICAL RULES:
-1. Output ONLY narrative prose. No headers, no markers, no meta-commentary.
-2. Describe EXACTLY what is given. The combatants are:
-   - The player character (named in the prompt)
-   - The enemies listed in the prompt
-   NO OTHER CHARACTERS EXIST. Do not invent party members, allies, or bystanders.
-3. NEVER mention HP, damage numbers, or game mechanics. NO NUMBERS.
-4. 1-2 vivid sentences per action. Brutal, visceral style.
-5. Describe deaths dramatically when indicated.
-6. Complete your sentences. Never stop mid-word.
-7. Output the narrative directly with no preamble or conclusion."""
+RULES:
+1. Narrate ONLY the characters listed in COMBATANTS. No others exist.
+2. Output prose only. No headers, markers, or meta-text.
+3. No HP, damage numbers, or game mechanics.
+4. 1-2 vivid sentences per attack. Brutal, visceral.
+5. Complete all sentences."""
 
 
 def build_narrator_prompt(
-    attack_results: list[AttackResult],
     player_name: str,
+    enemies: list[CombatEnemy],
+    attack_results: list[AttackResult],
     outcome: str = "ongoing",
 ) -> str:
     """Build a minimal prompt for the AI to narrate combat outcomes.
 
     Args:
-        attack_results: List of resolved attacks to narrate
         player_name: Name of the player character
+        enemies: List of enemies in combat
+        attack_results: List of resolved attacks to narrate
         outcome: Combat outcome - "ongoing", "player_died", "victory", or "fled"
 
     Returns:
         Prompt string for the AI
     """
+    # Explicitly list all combatants at the start
+    enemy_names = [e.name for e in enemies]
+    combatants = f"COMBATANTS: {player_name} (player)"
+    if enemy_names:
+        combatants += f", {', '.join(enemy_names)} (enemies)"
+    combatants += ". ONLY these characters exist. Narrate ONLY their actions."
+
     if not attack_results:
-        return "The combatants circle each other warily, waiting for an opening."
+        return f"{combatants}\n\nThe combatants circle each other warily, waiting for an opening."
 
     lines = []
 
@@ -181,11 +185,11 @@ def build_narrator_prompt(
             else:
                 lines.append(f"{actor} misses {target}")
 
-    prompt = "Narrate: " + "; ".join(lines)
+    prompt = f"{combatants}\n\nNarrate: " + "; ".join(lines)
 
     # Add explicit outcome instruction
     if outcome == "player_died":
-        prompt += f"\n\nOUTCOME: {player_name} DIES. Narrate their dramatic death. Do NOT narrate escape or survival."
+        prompt += f"\n\nOUTCOME: {player_name} DIES. Narrate their dramatic death."
     elif outcome == "victory":
         prompt += "\n\nOUTCOME: All enemies defeated. Narrate the victory."
 
