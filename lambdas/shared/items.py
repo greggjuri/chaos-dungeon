@@ -258,6 +258,7 @@ ITEM_ALIASES: dict[str, str] = {
 # =============================================================================
 
 QUEST_KEYWORDS = [
+    # Quest items
     "key",
     "letter",
     "note",
@@ -294,6 +295,45 @@ QUEST_KEYWORDS = [
     "scepter",
     "rod",
     "wand",
+    # Common objects (narrative items)
+    "rock",
+    "stone",
+    "pebble",
+    "shell",
+    "leaf",
+    "flower",
+    "herb",
+    "root",
+    "berry",
+    "mushroom",
+    "stick",
+    "twig",
+    "branch",
+    "cloth",
+    "rag",
+    "string",
+    "rope",
+    "bottle",
+    "jar",
+    "cup",
+    "bowl",
+    "plate",
+    "candle",
+    "mirror",
+    "bag",
+    "sack",
+    "box",
+    "crate",
+    "barrel",
+    "bucket",
+    "trinket",
+    "bauble",
+    "fragment",
+    "shard",
+    "piece",
+    "part",
+    "sample",
+    "specimen",
 ]
 
 

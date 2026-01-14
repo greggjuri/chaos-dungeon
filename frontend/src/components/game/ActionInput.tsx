@@ -1,7 +1,7 @@
 /**
  * Player action input component.
  */
-import { useState, useCallback, KeyboardEvent } from 'react';
+import { useState, useCallback, useRef, useEffect, KeyboardEvent } from 'react';
 
 interface Props {
   onSend: (action: string) => void;
@@ -18,6 +18,19 @@ const MAX_LENGTH = 500;
  */
 export function ActionInput({ onSend, disabled = false, isLoading = false, placeholder }: Props) {
   const [value, setValue] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-focus on mount
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
+
+  // Re-focus after action completes (isLoading transitions from true to false)
+  useEffect(() => {
+    if (!isLoading) {
+      textareaRef.current?.focus();
+    }
+  }, [isLoading]);
 
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();
@@ -44,6 +57,8 @@ export function ActionInput({ onSend, disabled = false, isLoading = false, place
     <div className="border-t border-gray-700 bg-gray-800 p-4">
       <div className="flex gap-2">
         <textarea
+          ref={textareaRef}
+          autoFocus
           value={value}
           onChange={(e) => setValue(e.target.value.slice(0, MAX_LENGTH))}
           onKeyDown={handleKeyDown}

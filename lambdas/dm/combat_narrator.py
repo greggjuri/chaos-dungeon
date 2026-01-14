@@ -85,7 +85,12 @@ def clean_narrator_output(text: str) -> str:
     if not text:
         return ""
 
-    lines = text.strip().split("\n")
+    # Strip surrounding double quotes if present (Mistral sometimes wraps responses)
+    text = text.strip()
+    if text.startswith('"') and text.endswith('"') and len(text) > 2:
+        text = text[1:-1].strip()
+
+    lines = text.split("\n")
     cleaned_lines = []
 
     for line in lines:
