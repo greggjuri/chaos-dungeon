@@ -24,6 +24,7 @@ import { Item } from '../types';
 export function GamePage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const [showInventory, setShowInventory] = useState(false);
+  const [inventoryHeight, setInventoryHeight] = useState(200);
 
   const {
     session,
@@ -58,6 +59,27 @@ export function GamePage() {
     // Character has full Item objects
     return character.inventory;
   }, [character]);
+
+  // Handle inventory panel resize via drag
+  const handleInventoryDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = inventoryHeight;
+
+    const handleMove = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientY - startY;
+      const newHeight = Math.max(100, Math.min(startHeight + delta, window.innerHeight * 0.5));
+      setInventoryHeight(newHeight);
+    };
+
+    const handleUp = () => {
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+    };
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
+  }, [inventoryHeight]);
 
   // Show loading state
   if (isLoading) {
@@ -111,7 +133,7 @@ export function GamePage() {
   const inventoryItems = getInventoryItems();
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900">
+    <div className="flex flex-col h-screen bg-gray-900 overflow-hidden">
       {/* Fixed header section - never scrolls */}
       <header className="flex-shrink-0 bg-gray-900 z-10">
         {/* Character status bar */}
@@ -128,13 +150,21 @@ export function GamePage() {
           </button>
         </div>
 
-        {/* Collapsible inventory panel */}
+        {/* Collapsible inventory panel with resizable height */}
         {showInventory && (
-          <div className="bg-gray-800/80 border-b border-gray-700 max-h-48 overflow-y-auto">
+          <div
+            className="bg-gray-800/80 border-b border-gray-700 overflow-y-auto relative"
+            style={{ height: `${inventoryHeight}px` }}
+          >
             <InventoryPanel
               items={inventoryItems}
               inCombat={combatActive || (combat?.active ?? false)}
               onUseItem={handleUseItem}
+            />
+            {/* Drag handle for resizing */}
+            <div
+              className="absolute bottom-0 left-0 right-0 h-2 bg-gray-700 cursor-ns-resize hover:bg-amber-600 transition-colors"
+              onMouseDown={handleInventoryDragStart}
             />
           </div>
         )}
