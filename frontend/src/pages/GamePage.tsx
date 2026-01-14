@@ -112,37 +112,40 @@ export function GamePage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] bg-gray-900">
-      {/* Character status bar - sticky top */}
-      <CharacterStatus character={character} snapshot={characterSnapshot} />
+      {/* Fixed header section - never scrolls */}
+      <div className="flex-shrink-0">
+        {/* Character status bar */}
+        <CharacterStatus character={character} snapshot={characterSnapshot} />
 
-      {/* Inventory toggle bar */}
-      <div className="bg-gray-800/50 border-b border-gray-700 px-4 py-1">
-        <button
-          onClick={() => setShowInventory(!showInventory)}
-          className="text-amber-400 hover:text-amber-300 text-sm font-medium flex items-center gap-1"
-        >
-          <span>{showInventory ? '▼' : '▶'}</span>
-          <span>Inventory ({inventoryItems.length})</span>
-        </button>
+        {/* Inventory toggle bar */}
+        <div className="bg-gray-800/50 border-b border-gray-700 px-4 py-1">
+          <button
+            onClick={() => setShowInventory(!showInventory)}
+            className="text-amber-400 hover:text-amber-300 text-sm font-medium flex items-center gap-1"
+          >
+            <span>{showInventory ? '▼' : '▶'}</span>
+            <span>Inventory ({inventoryItems.length})</span>
+          </button>
+        </div>
+
+        {/* Collapsible inventory panel */}
+        {showInventory && (
+          <div className="bg-gray-800/80 border-b border-gray-700 max-h-48 overflow-y-auto">
+            <InventoryPanel
+              items={inventoryItems}
+              inCombat={combatActive || (combat?.active ?? false)}
+              onUseItem={handleUseItem}
+            />
+          </div>
+        )}
+
+        {/* Error toast */}
+        {error && (
+          <div className="mx-4 mt-2 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-200 text-sm">
+            {error}
+          </div>
+        )}
       </div>
-
-      {/* Collapsible inventory panel */}
-      {showInventory && (
-        <div className="bg-gray-800/80 border-b border-gray-700 max-h-48 overflow-y-auto">
-          <InventoryPanel
-            items={inventoryItems}
-            inCombat={combatActive || (combat?.active ?? false)}
-            onUseItem={handleUseItem}
-          />
-        </div>
-      )}
-
-      {/* Error toast */}
-      {error && (
-        <div className="mx-4 mt-2 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-200 text-sm">
-          {error}
-        </div>
-      )}
 
       {/* Chat history - scrollable middle */}
       <ChatHistory messages={messages} isLoading={isSendingAction} />

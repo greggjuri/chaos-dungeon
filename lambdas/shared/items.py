@@ -371,13 +371,20 @@ def get_starting_equipment(character_class: str) -> list[dict]:
     equipment_ids = STARTING_EQUIPMENT.get(character_class.lower(), [])
     inventory = []
 
+    # Default quantities for stackable items
+    starting_quantities = {
+        "rations": 7,  # A week's worth
+        "torch": 3,    # A few torches
+    }
+
     for item_id in equipment_ids:
         if item_id in ITEM_CATALOG:
             item_def = ITEM_CATALOG[item_id]
+            quantity = starting_quantities.get(item_id, 1)
             inventory.append({
                 "item_id": item_id,
                 "name": item_def.name,
-                "quantity": 1,
+                "quantity": quantity,
                 "item_type": item_def.item_type.value,
                 "description": item_def.description,
             })

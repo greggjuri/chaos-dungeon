@@ -72,7 +72,27 @@ class TestStartingEquipment:
             assert "quantity" in item
             assert "item_type" in item
             assert "description" in item
-            assert item["quantity"] == 1
+            assert item["quantity"] >= 1
+
+    def test_rations_start_with_seven(self) -> None:
+        """Rations should have quantity 7 (a week's worth)."""
+        equipment = get_starting_equipment("fighter")
+        rations = next(i for i in equipment if i["item_id"] == "rations")
+        assert rations["quantity"] == 7
+
+    def test_torch_starts_with_three(self) -> None:
+        """Torch should have quantity 3."""
+        equipment = get_starting_equipment("fighter")
+        torch = next(i for i in equipment if i["item_id"] == "torch")
+        assert torch["quantity"] == 3
+
+    def test_non_stackable_items_quantity_one(self) -> None:
+        """Non-stackable items (weapons, armor) have quantity 1."""
+        equipment = get_starting_equipment("fighter")
+        sword = next(i for i in equipment if i["item_id"] == "sword")
+        shield = next(i for i in equipment if i["item_id"] == "shield")
+        assert sword["quantity"] == 1
+        assert shield["quantity"] == 1
 
     def test_starting_equipment_unknown_class(self) -> None:
         """Unknown class returns empty list."""

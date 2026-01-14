@@ -1238,6 +1238,30 @@ class DMService:
                 )
         return dice_rolls
 
+    def _find_inventory_item_index(
+        self, inventory: list, item_name: str
+    ) -> int | None:
+        """Find item index by name or item_id (case-insensitive).
+
+        Args:
+            inventory: List of inventory items (dicts or strings)
+            item_name: Item name or ID to find
+
+        Returns:
+            Index of item if found, None otherwise
+        """
+        normalized = item_name.lower().strip()
+        for i, item in enumerate(inventory):
+            if isinstance(item, dict):
+                if item.get("name", "").lower() == normalized:
+                    return i
+                if item.get("item_id", "").lower() == normalized:
+                    return i
+            elif isinstance(item, str):
+                if item.lower() == normalized:
+                    return i
+        return None
+
     def _apply_state_changes(
         self,
         character: dict,
@@ -1299,25 +1323,23 @@ class DMService:
                 )
 
         for item_name in state.inventory_remove:
-            # Try to find item by name or id
-            item_def = find_item_by_name(item_name)
-            target_id = item_def.id if item_def else None
-            target_name = item_name.lower()
-
-            # Find and remove item (match by id or name)
-            new_inventory = []
-            for item in inventory:
+            idx = self._find_inventory_item_index(inventory, item_name)
+            if idx is not None:
+                item = inventory[idx]
                 if isinstance(item, dict):
-                    item_id = item.get("item_id", "")
-                    item_item_name = item.get("name", "").lower()
-                    # Keep if doesn't match target
-                    if item_id != target_id and item_item_name != target_name:
-                        new_inventory.append(item)
+                    qty = item.get("quantity", 1)
+                    if qty > 1:
+                        inventory[idx]["quantity"] = qty - 1
+                        logger.info(f"Decremented {item_name} quantity to {qty - 1}")
+                    else:
+                        inventory.pop(idx)
+                        logger.info(f"Removed {item_name} from inventory")
                 else:
-                    # Legacy string format - keep if doesn't match
-                    if item.lower() != target_name:
-                        new_inventory.append(item)
-            inventory = new_inventory
+                    # Legacy string format
+                    inventory.pop(idx)
+                    logger.info(f"Removed {item_name} from inventory (legacy)")
+            else:
+                logger.warning(f"Tried to remove item not in inventory: {item_name}")
 
         character["inventory"] = inventory
 

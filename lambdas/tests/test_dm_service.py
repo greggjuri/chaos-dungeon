@@ -291,6 +291,67 @@ class TestApplyStateChanges:
 
         assert len(char["inventory"]) == 2  # Unchanged
 
+    def test_inventory_remove_case_insensitive(self, service, sample_character, sample_session):
+        """'shield' (lowercase) should remove 'Shield' (title case) from inventory."""
+        dm_response = DMResponse(
+            narrative="Dropped!",
+            state_changes=StateChanges(inventory_remove=["shield"]),  # lowercase
+        )
+
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
+
+        inventory_names = [item["name"] for item in char["inventory"]]
+        assert "Shield" not in inventory_names
+        assert len(char["inventory"]) == 1  # Only Sword remains
+
+    def test_inventory_remove_by_item_id(self, service, sample_character, sample_session):
+        """Should be able to remove item by item_id."""
+        dm_response = DMResponse(
+            narrative="Dropped!",
+            state_changes=StateChanges(inventory_remove=["sword"]),  # item_id not name
+        )
+
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
+
+        inventory_ids = [item["item_id"] for item in char["inventory"]]
+        assert "sword" not in inventory_ids
+        assert len(char["inventory"]) == 1  # Only Shield remains
+
+    def test_inventory_remove_decrements_quantity(self, service, sample_character, sample_session):
+        """Removing from qty > 1 should decrement quantity instead of removing item."""
+        # Add item with quantity 7
+        sample_character["inventory"].append({
+            "item_id": "rations",
+            "name": "Rations",
+            "quantity": 7,
+            "item_type": "consumable",
+            "description": "A week's worth of trail rations.",
+        })
+
+        dm_response = DMResponse(
+            narrative="Ate some rations",
+            state_changes=StateChanges(inventory_remove=["rations"]),
+        )
+
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
+
+        # Should still have rations but with qty 6
+        rations = next((i for i in char["inventory"] if i["item_id"] == "rations"), None)
+        assert rations is not None
+        assert rations["quantity"] == 6
+
+    def test_inventory_remove_at_quantity_one(self, service, sample_character, sample_session):
+        """Removing at qty 1 should remove the item entirely."""
+        dm_response = DMResponse(
+            narrative="Dropped!",
+            state_changes=StateChanges(inventory_remove=["Sword"]),
+        )
+
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
+
+        inventory_ids = [item["item_id"] for item in char["inventory"]]
+        assert "sword" not in inventory_ids
+
     def test_location_update(self, service, sample_character, sample_session):
         """Location should be updated."""
         dm_response = DMResponse(
