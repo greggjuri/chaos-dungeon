@@ -28,7 +28,7 @@ export function ChatHistory({ messages, isLoading = false }: Props) {
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-y-auto px-4 py-4 space-y-4"
+      className="h-full px-4 py-4 space-y-4"
     >
       {messages.length === 0 && !isLoading && (
         <div className="text-center text-gray-500 py-8">
