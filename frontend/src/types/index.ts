@@ -241,7 +241,7 @@ export interface CharacterSnapshot {
   xp: number;
   gold: number;
   level: number;
-  inventory: string[];  // Backend sends item names as strings currently
+  inventory: Item[];  // Full item objects with quantity, type, etc.
 }
 
 /** Token usage statistics for cost monitoring */

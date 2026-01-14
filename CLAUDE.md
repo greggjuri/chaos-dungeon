@@ -17,7 +17,7 @@ A text-based RPG web game where Claude serves as an intelligent Dungeon Master, 
 - **Never create a file longer than 500 lines** - refactor into modules
 - **Commit and push after every completed feature**
 - Use conventional commit messages: `feat:`, `fix:`, `refactor:`, `docs:`
-- Keep functions under 50 lines where possible
+- Keep functions under 500 lines where possible
 - Type hints required for all Python functions
 - TypeScript strict mode for frontend
 

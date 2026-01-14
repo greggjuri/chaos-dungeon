@@ -6,6 +6,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from shared.items import InventoryItem
+
 
 class CombatPhase(str, Enum):
     """Combat state machine phases."""
@@ -338,8 +340,8 @@ class CharacterSnapshot(BaseModel):
     level: int
     """Character level."""
 
-    inventory: list[str]
-    """List of item names in inventory."""
+    inventory: list[InventoryItem]
+    """List of items in inventory."""
 
 
 class UsageStats(BaseModel):

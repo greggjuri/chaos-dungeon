@@ -8,6 +8,7 @@ import pytest
 
 from dm.models import ActionResponse, CharacterSnapshot, DiceRoll, StateChanges
 from shared.cost_guard import LimitStatus
+from shared.items import InventoryItem
 
 
 @pytest.fixture
@@ -46,7 +47,10 @@ def sample_action_response():
             xp=10,
             gold=100,
             level=1,
-            inventory=["Sword", "Shield"],
+            inventory=[
+                InventoryItem(item_id="sword", name="Sword", quantity=1, item_type="weapon"),
+                InventoryItem(item_id="shield", name="Shield", quantity=1, item_type="armor"),
+            ],
         ),
         character_dead=False,
         session_ended=False,

@@ -62,7 +62,10 @@ describe('CharacterStatus', () => {
       xp: 5000,
       gold: 200,
       level: 4,
-      inventory: ['Sword', 'Shield'],
+      inventory: [
+        { name: 'Sword', quantity: 1, item_type: 'weapon' },
+        { name: 'Shield', quantity: 1, item_type: 'armor' },
+      ],
     };
 
     render(<CharacterStatus character={mockCharacter} snapshot={snapshot} />);

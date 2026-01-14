@@ -1,6 +1,5 @@
 """Tests for item catalog and inventory helpers."""
 
-import pytest
 
 from shared.items import (
     ITEM_CATALOG,

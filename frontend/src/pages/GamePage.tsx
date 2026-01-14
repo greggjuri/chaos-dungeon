@@ -111,9 +111,9 @@ export function GamePage() {
   const inventoryItems = getInventoryItems();
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] bg-gray-900">
+    <div className="flex flex-col h-[calc(100vh-4rem)] bg-gray-900 overflow-hidden">
       {/* Fixed header section - never scrolls */}
-      <div className="flex-shrink-0">
+      <div className="flex-shrink-0 bg-gray-900 z-10">
         {/* Character status bar */}
         <CharacterStatus character={character} snapshot={characterSnapshot} />
 
@@ -147,27 +147,30 @@ export function GamePage() {
         )}
       </div>
 
-      {/* Chat history - scrollable middle */}
-      <ChatHistory messages={messages} isLoading={isSendingAction} />
+      {/* Scrollable content area - takes remaining space */}
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        {/* Chat history - scrollable middle */}
+        <ChatHistory messages={messages} isLoading={isSendingAction} />
 
-      {/* Combat UI - shown when turn-based combat is active */}
-      {combat && combat.active && (
-        <CombatUI
-          combat={combat}
-          onAction={sendCombatAction}
-          isLoading={isSendingAction}
-        />
-      )}
+        {/* Combat UI - shown when turn-based combat is active */}
+        {combat && combat.active && (
+          <CombatUI
+            combat={combat}
+            onAction={sendCombatAction}
+            isLoading={isSendingAction}
+          />
+        )}
 
-      {/* Legacy combat status - shown when combat active but no turn-based UI */}
-      {combatActive && (!combat || !combat.active) && (
-        <CombatStatus enemies={enemies} combatActive={combatActive} />
-      )}
+        {/* Legacy combat status - shown when combat active but no turn-based UI */}
+        {combatActive && (!combat || !combat.active) && (
+          <CombatStatus enemies={enemies} combatActive={combatActive} />
+        )}
 
-      {/* Death screen - shown inline at bottom when character dies */}
-      {characterDead && (
-        <DeathScreen character={character} snapshot={characterSnapshot} />
-      )}
+        {/* Death screen - shown inline at bottom when character dies */}
+        {characterDead && (
+          <DeathScreen character={character} snapshot={characterSnapshot} />
+        )}
+      </div>
 
       {/* Action input - always shown when not dead (can type during combat too) */}
       {!characterDead && (

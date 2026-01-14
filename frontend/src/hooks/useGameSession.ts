@@ -122,7 +122,7 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
         xp: characterData.xp,
         gold: characterData.gold,
         level: characterData.level,
-        inventory: characterData.inventory.map((item) => item.name),
+        inventory: characterData.inventory,
       });
 
       // Check if character is already dead
@@ -213,6 +213,21 @@ export function useGameSession(sessionId: string): UseGameSessionReturn {
 
         // Update character snapshot
         setCharacterSnapshot(response.character);
+
+        // Sync character state from response (includes inventory changes)
+        setCharacter((prev) =>
+          prev
+            ? {
+                ...prev,
+                hp: response.character.hp,
+                max_hp: response.character.max_hp,
+                xp: response.character.xp,
+                gold: response.character.gold,
+                level: response.character.level,
+                inventory: response.character.inventory,
+              }
+            : null
+        );
 
         // Update usage stats if available
         if (response.usage) {

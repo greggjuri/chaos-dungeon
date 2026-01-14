@@ -43,7 +43,7 @@ from shared.cost_limits import CostLimits
 from shared.db import DynamoDBClient, convert_floats_to_decimal
 from shared.dice import roll as roll_dice_notation
 from shared.exceptions import GameStateError, NotFoundError
-from shared.items import ITEM_CATALOG, find_item_by_name
+from shared.items import ITEM_CATALOG, InventoryItem, find_item_by_name
 from shared.models import AbilityScores, Character, Item, Message, Session
 from shared.token_tracker import TokenTracker
 
@@ -578,11 +578,8 @@ class DMService:
         action_summary = "Fled combat" if fled else ("Victory!" if victory else "Defeat")
         session = self._append_messages(session, action_summary, narrative)
 
-        # Build inventory list
-        inventory_names = [
-            item["name"] if isinstance(item, dict) else item
-            for item in character.get("inventory", [])
-        ]
+        # Build inventory list with full item objects
+        inventory_items = self._build_inventory_items(character.get("inventory", []))
 
         # Build dice rolls from attack results (includes the killing blow)
         logger.debug(
@@ -622,7 +619,7 @@ class DMService:
                 xp=character["xp"],
                 gold=character["gold"],
                 level=character["level"],
-                inventory=inventory_names,
+                inventory=inventory_items,
             ),
             character_dead=character_dead,
             session_ended=session_ended,
@@ -769,11 +766,8 @@ class DMService:
         # Build dice rolls from attack results
         dice_rolls = self._build_combat_dice_rolls_from_list(attack_results)
 
-        # Build inventory list
-        inventory_names = [
-            item["name"] if isinstance(item, dict) else item
-            for item in character.get("inventory", [])
-        ]
+        # Build inventory list with full item objects
+        inventory_items = self._build_inventory_items(character.get("inventory", []))
 
         # Get living enemies for response - use dicts to ensure id is serialized
         living_enemies = [e for e in combat_enemies if e.hp > 0]
@@ -833,7 +827,7 @@ class DMService:
                 xp=character["xp"],
                 gold=character["gold"],
                 level=character["level"],
-                inventory=inventory_names,
+                inventory=inventory_items,
             ),
             character_dead=False,
             session_ended=False,
@@ -891,6 +885,43 @@ class DMService:
                     )
                 )
         return dice_rolls
+
+    def _build_inventory_items(self, inventory: list) -> list[InventoryItem]:
+        """Build InventoryItem list from character inventory data.
+
+        Handles both dict items (full objects) and legacy string items.
+
+        Args:
+            inventory: List of inventory items (dicts or strings)
+
+        Returns:
+            List of InventoryItem objects for the response
+        """
+        items = []
+        for item in inventory:
+            if isinstance(item, dict):
+                # Full item dict - convert to InventoryItem
+                items.append(
+                    InventoryItem(
+                        item_id=item.get("item_id", "unknown"),
+                        name=item.get("name", "Unknown Item"),
+                        quantity=item.get("quantity", 1),
+                        item_type=item.get("item_type", "misc"),
+                        description=item.get("description", ""),
+                    )
+                )
+            else:
+                # Legacy string item - create minimal InventoryItem
+                items.append(
+                    InventoryItem(
+                        item_id="unknown",
+                        name=str(item),
+                        quantity=1,
+                        item_type="misc",
+                        description="",
+                    )
+                )
+        return items
 
     def _process_normal_action(
         self,
@@ -1006,11 +1037,8 @@ class DMService:
                 extra={"character_id": character_id, "session_id": session_id},
             )
 
-        # Build response
-        inventory_names = [
-            item["name"] if isinstance(item, dict) else item
-            for item in character.get("inventory", [])
-        ]
+        # Build response - inventory list with full item objects
+        inventory_items = self._build_inventory_items(character.get("inventory", []))
 
         # Use session combat state (set by _initiate_combat) rather than Claude's response
         is_combat_active = session.get("combat_state", {}).get("active", False)
@@ -1093,7 +1121,7 @@ class DMService:
                 xp=character["xp"],
                 gold=character["gold"],
                 level=character["level"],
-                inventory=inventory_names,
+                inventory=inventory_items,
             ),
             character_dead=character_dead,
             session_ended=session_ended,
