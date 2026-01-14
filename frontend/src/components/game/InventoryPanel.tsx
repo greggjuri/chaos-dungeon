@@ -54,10 +54,10 @@ export function InventoryPanel({ items, onUseItem, inCombat }: InventoryPanelPro
           <h4 className="font-bold text-amber-400 mb-1 text-xs uppercase tracking-wider">Equipment</h4>
           <div className="space-y-0.5">
             {equipment.map((item, idx) => (
-              <div key={item.item_id || idx} className="flex justify-between items-center">
+              <div key={item.item_id || idx} className="flex items-center">
                 <span className={getItemTypeColor(item.item_type)}>{item.name}</span>
                 {item.quantity > 1 && (
-                  <span className="text-gray-500 text-xs">x{item.quantity}</span>
+                  <span className="text-gray-500 text-xs ml-1">({item.quantity})</span>
                 )}
               </div>
             ))}
@@ -71,19 +71,21 @@ export function InventoryPanel({ items, onUseItem, inCombat }: InventoryPanelPro
           <h4 className="font-bold text-green-400 mb-1 text-xs uppercase tracking-wider">Consumables</h4>
           <div className="space-y-0.5">
             {consumables.map((item, idx) => (
-              <div key={item.item_id || idx} className="flex justify-between items-center">
-                <span className={getItemTypeColor(item.item_type)}>{item.name}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500 text-xs">x{item.quantity}</span>
-                  {inCombat && onUseItem && item.item_id && (
-                    <button
-                      onClick={() => onUseItem(item.item_id!)}
-                      className="px-2 py-0.5 text-xs bg-green-600 hover:bg-green-500 rounded text-white"
-                    >
-                      Use
-                    </button>
+              <div key={item.item_id || idx} className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <span className={getItemTypeColor(item.item_type)}>{item.name}</span>
+                  {item.quantity > 1 && (
+                    <span className="text-gray-500 text-xs ml-1">({item.quantity})</span>
                   )}
                 </div>
+                {inCombat && onUseItem && item.item_id && (
+                  <button
+                    onClick={() => onUseItem(item.item_id!)}
+                    className="px-2 py-0.5 text-xs bg-green-600 hover:bg-green-500 rounded text-white"
+                  >
+                    Use
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -96,10 +98,10 @@ export function InventoryPanel({ items, onUseItem, inCombat }: InventoryPanelPro
           <h4 className="font-bold text-purple-400 mb-1 text-xs uppercase tracking-wider">Quest Items</h4>
           <div className="space-y-0.5">
             {questItems.map((item, idx) => (
-              <div key={item.item_id || idx} className="flex justify-between items-center">
+              <div key={item.item_id || idx} className="flex items-center">
                 <span className={getItemTypeColor(item.item_type)}>{item.name}</span>
                 {item.quantity > 1 && (
-                  <span className="text-gray-500 text-xs">x{item.quantity}</span>
+                  <span className="text-gray-500 text-xs ml-1">({item.quantity})</span>
                 )}
               </div>
             ))}
@@ -113,10 +115,10 @@ export function InventoryPanel({ items, onUseItem, inCombat }: InventoryPanelPro
           <h4 className="font-bold text-gray-400 mb-1 text-xs uppercase tracking-wider">Other</h4>
           <div className="space-y-0.5">
             {other.map((item, idx) => (
-              <div key={item.item_id || idx} className="flex justify-between items-center">
+              <div key={item.item_id || idx} className="flex items-center">
                 <span className={getItemTypeColor(item.item_type)}>{item.name}</span>
                 {item.quantity > 1 && (
-                  <span className="text-gray-500 text-xs">x{item.quantity}</span>
+                  <span className="text-gray-500 text-xs ml-1">({item.quantity})</span>
                 )}
               </div>
             ))}

@@ -1335,8 +1335,23 @@ class DMService:
                 )
                 continue  # Skip unknown items
 
-            # Only add if not already in inventory
-            if item_def.id not in inventory_ids:
+            # Check if item already in inventory
+            existing_idx = None
+            for i, inv_item in enumerate(inventory):
+                if isinstance(inv_item, dict) and inv_item.get("item_id") == item_def.id:
+                    existing_idx = i
+                    break
+
+            if existing_idx is not None:
+                # Increment quantity of existing item
+                current_qty = inventory[existing_idx].get("quantity", 1)
+                inventory[existing_idx]["quantity"] = current_qty + 1
+                logger.info(
+                    f"Incremented {item_def.name} quantity to {current_qty + 1}",
+                    extra={"item_id": item_def.id},
+                )
+            else:
+                # Add new item
                 inventory.append({
                     "item_id": item_def.id,
                     "name": item_def.name,
