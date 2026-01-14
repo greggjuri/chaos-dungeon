@@ -12,5 +12,6 @@ export { CombatUI } from './CombatUI';
 export { DeathScreen } from './DeathScreen';
 export { DiceRoll } from './DiceRoll';
 export { EnemyCard } from './EnemyCard';
+export { InventoryPanel } from './InventoryPanel';
 export { StateChangeSummary } from './StateChangeSummary';
 export { TokenCounter } from './TokenCounter';

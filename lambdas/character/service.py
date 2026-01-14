@@ -11,6 +11,7 @@ from shared.becmi import (
     roll_starting_hp,
 )
 from shared.db import DynamoDBClient
+from shared.items import get_starting_equipment
 from shared.utils import (
     calculate_modifier,
     generate_id,
@@ -56,6 +57,9 @@ class CharacterService:
         abilities = get_starting_abilities(char_class)
         gold = roll_starting_gold()
 
+        # Get class-appropriate starting equipment
+        inventory = get_starting_equipment(request.character_class)
+
         character = {
             "character_id": character_id,
             "name": request.name,
@@ -66,7 +70,7 @@ class CharacterService:
             "max_hp": hp,
             "gold": gold,
             "stats": stats,
-            "inventory": [],
+            "inventory": inventory,
             "abilities": abilities,
             "created_at": now,
             "updated_at": now,

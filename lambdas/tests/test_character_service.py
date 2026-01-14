@@ -49,7 +49,12 @@ class TestCreateCharacter:
         assert result["level"] == 1
         assert result["xp"] == 0
         assert result["gold"] == 120
-        assert result["inventory"] == []
+        # Fighter gets starting equipment
+        assert len(result["inventory"]) > 0
+        item_ids = [item["item_id"] for item in result["inventory"]]
+        assert "sword" in item_ids
+        assert "shield" in item_ids
+        assert "chain_mail" in item_ids
         assert "Attack" in result["abilities"]
         assert "Parry" in result["abilities"]
 
@@ -93,6 +98,61 @@ class TestCreateCharacter:
 
         assert 30 <= result["gold"] <= 180
         assert result["gold"] % 10 == 0
+
+    def test_create_fighter_has_starting_equipment(self, service, mock_db):
+        """Fighter gets sword, shield, chain mail."""
+        request = CharacterCreateRequest(name="Warrior", character_class="fighter")
+        result = service.create_character("user-123", request)
+
+        item_ids = [item["item_id"] for item in result["inventory"]]
+        assert "sword" in item_ids
+        assert "shield" in item_ids
+        assert "chain_mail" in item_ids
+        assert "backpack" in item_ids
+
+    def test_create_thief_has_starting_equipment(self, service, mock_db):
+        """Thief gets dagger, leather armor, thieves' tools."""
+        request = CharacterCreateRequest(name="Rogue", character_class="thief")
+        result = service.create_character("user-123", request)
+
+        item_ids = [item["item_id"] for item in result["inventory"]]
+        assert "dagger" in item_ids
+        assert "leather_armor" in item_ids
+        assert "thieves_tools" in item_ids
+
+    def test_create_cleric_has_starting_equipment(self, service, mock_db):
+        """Cleric gets mace, shield, holy symbol."""
+        request = CharacterCreateRequest(name="Priest", character_class="cleric")
+        result = service.create_character("user-123", request)
+
+        item_ids = [item["item_id"] for item in result["inventory"]]
+        assert "mace" in item_ids
+        assert "shield" in item_ids
+        assert "holy_symbol" in item_ids
+        assert "chain_mail" in item_ids
+
+    def test_create_magic_user_has_starting_equipment(self, service, mock_db):
+        """Magic user gets dagger, staff, spellbook, robes."""
+        request = CharacterCreateRequest(name="Wizard", character_class="magic_user")
+        result = service.create_character("user-123", request)
+
+        item_ids = [item["item_id"] for item in result["inventory"]]
+        assert "dagger" in item_ids
+        assert "staff" in item_ids
+        assert "spellbook" in item_ids
+        assert "robes" in item_ids
+
+    def test_create_character_inventory_has_proper_structure(self, service, mock_db):
+        """Inventory items have complete structure."""
+        request = CharacterCreateRequest(name="Test", character_class="fighter")
+        result = service.create_character("user-123", request)
+
+        for item in result["inventory"]:
+            assert "item_id" in item
+            assert "name" in item
+            assert "quantity" in item
+            assert "item_type" in item
+            assert "description" in item
 
 
 class TestListCharacters:

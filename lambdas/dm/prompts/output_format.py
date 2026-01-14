@@ -40,10 +40,20 @@ Rules for state changes:
 - hp_delta: negative for damage, positive for healing
 - gold_delta: negative for spending, positive for looting
 - xp_delta: award XP for solving puzzles, good roleplay (NOT combat - server handles combat XP)
-- inventory_add/remove: list of item names
+- inventory_add/remove: list of item names (see ITEMS YOU CAN GIVE below)
 - world_state: permanent flags that affect the story
 - dice_rolls: for NON-COMBAT rolls only (skill checks, saves). Never roll combat dice.
 - enemies: list enemies when combat BEGINS (see combat rules below)
+
+ITEMS YOU CAN GIVE:
+When rewarding players with items, use these standard names so they appear correctly in inventory:
+- Weapons: Sword, Dagger, Mace, Staff
+- Armor: Shield, Leather Armor, Chain Mail
+- Consumables: Potion of Healing, Torch, Rations
+- Quest items: Keys (Rusty Key, Golden Key), scrolls, letters, amulets, rings, tokens, lockets
+
+Quest items are flexible - you can name them descriptively (e.g., "Blood-Stained Letter", "Ornate Locket", "Iron Key") and the server will recognize them.
+For weapons, armor, and potions, use the exact names above for proper inventory tracking.
 
 If no state changes occurred, use:
 ```json

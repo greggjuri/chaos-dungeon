@@ -83,9 +83,13 @@ class DMPromptBuilder:
         con_mod = calculate_modifier(abilities.constitution)
         cha_mod = calculate_modifier(abilities.charisma)
 
-        # Format inventory (list of Item objects)
+        # Format inventory with item types for clarity
         if character.inventory:
-            inventory_str = ", ".join(item.name for item in character.inventory)
+            inventory_items = []
+            for item in character.inventory:
+                item_type = getattr(item, 'item_type', 'misc')
+                inventory_items.append(f"{item.name} ({item_type})")
+            inventory_str = ", ".join(inventory_items)
         else:
             inventory_str = "Empty"
 

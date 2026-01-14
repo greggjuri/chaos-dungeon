@@ -102,8 +102,8 @@ def sample_character():
             "charisma": 11,
         },
         "inventory": [
-            {"name": "Sword", "quantity": 1, "weight": 3.0},
-            {"name": "Shield", "quantity": 1, "weight": 6.0},
+            {"item_id": "sword", "name": "Sword", "quantity": 1, "item_type": "weapon", "description": "A trusty steel sword."},
+            {"item_id": "shield", "name": "Shield", "quantity": 1, "item_type": "armor", "description": "A sturdy wooden shield."},
         ],
     }
 
@@ -200,18 +200,59 @@ class TestApplyStateChanges:
 
         assert char["xp"] == 100
 
-    def test_inventory_add(self, service, sample_character, sample_session):
-        """Items should be added to inventory."""
+    def test_inventory_add_valid_item(self, service, sample_character, sample_session):
+        """Valid catalog items should be added to inventory."""
         dm_response = DMResponse(
             narrative="Found!",
-            state_changes=StateChanges(inventory_add=["Potion", "Key"]),
+            state_changes=StateChanges(inventory_add=["Potion of Healing", "Rusty Key"]),
         )
 
         char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
-        inventory_names = [item["name"] for item in char["inventory"]]
-        assert "Potion" in inventory_names
-        assert "Key" in inventory_names
+        inventory_ids = [item["item_id"] for item in char["inventory"]]
+        assert "potion_healing" in inventory_ids
+        assert "rusty_key" in inventory_ids
+
+    def test_inventory_add_with_alias(self, service, sample_character, sample_session):
+        """Items via alias should be added correctly."""
+        dm_response = DMResponse(
+            narrative="Found a healing potion!",
+            state_changes=StateChanges(inventory_add=["healing potion"]),
+        )
+
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
+
+        inventory_ids = [item["item_id"] for item in char["inventory"]]
+        assert "potion_healing" in inventory_ids
+
+    def test_inventory_add_unknown_item_skipped(self, service, sample_character, sample_session):
+        """Unknown items should be skipped with a warning."""
+        dm_response = DMResponse(
+            narrative="Found!",
+            state_changes=StateChanges(inventory_add=["Vorpal Blade", "Dagger"]),
+        )
+
+        original_count = len(sample_character["inventory"])
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
+
+        # Vorpal Blade is unknown, should be skipped
+        # Dagger is valid, should be added
+        assert len(char["inventory"]) == original_count + 1
+        inventory_ids = [item["item_id"] for item in char["inventory"]]
+        assert "dagger" in inventory_ids
+
+    def test_inventory_add_dynamic_quest_item(self, service, sample_character, sample_session):
+        """Quest items with keywords should be created dynamically."""
+        dm_response = DMResponse(
+            narrative="Found!",
+            state_changes=StateChanges(inventory_add=["Ornate Locket"]),
+        )
+
+        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
+
+        inventory_ids = [item["item_id"] for item in char["inventory"]]
+        # Should have a quest item with locket in the id
+        assert any("locket" in item_id for item_id in inventory_ids)
 
     def test_inventory_add_no_duplicates(self, service, sample_character, sample_session):
         """Duplicate items should not be added."""
@@ -311,6 +352,129 @@ class TestApplyStateChanges:
 
         assert session["combat_active"] is False
         assert session["enemies"] == []
+
+
+class TestHandleUseItem:
+    """Tests for _handle_use_item method."""
+
+    def test_use_healing_potion_heals_hp(self, service, sample_character):
+        """Using healing potion should restore HP."""
+        # Give character a healing potion
+        sample_character["inventory"].append({
+            "item_id": "potion_healing",
+            "name": "Potion of Healing",
+            "quantity": 1,
+            "item_type": "consumable",
+            "description": "Heals 1d8 HP.",
+        })
+        sample_character["hp"] = 3  # Low HP
+        sample_character["max_hp"] = 8
+
+        with patch("dm.service.roll_dice_notation", return_value=(5, [5])):
+            result = service._handle_use_item(sample_character, "potion_healing", 1)
+
+        assert result is not None
+        assert result["healing"] == 5
+        assert sample_character["hp"] == 8  # 3 + 5 = 8
+
+    def test_use_healing_potion_removes_from_inventory(self, service, sample_character):
+        """Using potion should remove it from inventory."""
+        sample_character["inventory"].append({
+            "item_id": "potion_healing",
+            "name": "Potion of Healing",
+            "quantity": 1,
+            "item_type": "consumable",
+            "description": "Heals 1d8 HP.",
+        })
+        sample_character["hp"] = 3
+
+        with patch("dm.service.roll_dice_notation", return_value=(5, [5])):
+            service._handle_use_item(sample_character, "potion_healing", 1)
+
+        inventory_ids = [item["item_id"] for item in sample_character["inventory"]]
+        assert "potion_healing" not in inventory_ids
+
+    def test_use_item_decrements_quantity(self, service, sample_character):
+        """Using item with quantity > 1 should decrement quantity."""
+        sample_character["inventory"].append({
+            "item_id": "potion_healing",
+            "name": "Potion of Healing",
+            "quantity": 3,
+            "item_type": "consumable",
+            "description": "Heals 1d8 HP.",
+        })
+        sample_character["hp"] = 3
+
+        with patch("dm.service.roll_dice_notation", return_value=(5, [5])):
+            service._handle_use_item(sample_character, "potion_healing", 1)
+
+        potion = next(
+            (item for item in sample_character["inventory"] if item["item_id"] == "potion_healing"),
+            None
+        )
+        assert potion is not None
+        assert potion["quantity"] == 2
+
+    def test_use_item_healing_capped_at_max_hp(self, service, sample_character):
+        """Healing should not exceed max HP."""
+        sample_character["inventory"].append({
+            "item_id": "potion_healing",
+            "name": "Potion of Healing",
+            "quantity": 1,
+            "item_type": "consumable",
+            "description": "Heals 1d8 HP.",
+        })
+        sample_character["hp"] = 7  # Near max
+        sample_character["max_hp"] = 8
+
+        with patch("dm.service.roll_dice_notation", return_value=(8, [8])):  # Roll max
+            result = service._handle_use_item(sample_character, "potion_healing", 1)
+
+        assert sample_character["hp"] == 8  # Capped at max
+        assert result["healing"] == 1  # Only 1 HP actually restored
+
+    def test_use_item_no_potion_returns_none(self, service, sample_character):
+        """Using item without having potion should return None."""
+        # No potion in inventory
+        result = service._handle_use_item(sample_character, None, 1)
+
+        assert result is None
+
+    def test_use_item_auto_select_potion(self, service, sample_character):
+        """Should auto-select healing potion if no item_id provided."""
+        sample_character["inventory"].append({
+            "item_id": "potion_healing",
+            "name": "Potion of Healing",
+            "quantity": 1,
+            "item_type": "consumable",
+            "description": "Heals 1d8 HP.",
+        })
+        sample_character["hp"] = 3
+        sample_character["max_hp"] = 8
+
+        with patch("dm.service.roll_dice_notation", return_value=(5, [5])):
+            result = service._handle_use_item(sample_character, None, 1)
+
+        assert result is not None
+        assert result["healing"] == 5
+
+    def test_use_item_creates_log_entry(self, service, sample_character):
+        """Using item should create combat log entry."""
+        sample_character["inventory"].append({
+            "item_id": "potion_healing",
+            "name": "Potion of Healing",
+            "quantity": 1,
+            "item_type": "consumable",
+            "description": "Heals 1d8 HP.",
+        })
+        sample_character["hp"] = 3
+
+        with patch("dm.service.roll_dice_notation", return_value=(5, [5])):
+            result = service._handle_use_item(sample_character, "potion_healing", 1)
+
+        assert len(result["log_entries"]) == 1
+        assert result["log_entries"][0].action == "use_item"
+        assert "healed" in result["log_entries"][0].result
 
 
 class TestAppendMessages:

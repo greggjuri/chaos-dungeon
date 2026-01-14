@@ -21,9 +21,11 @@ export interface AbilityScores {
 
 /** Inventory item */
 export interface Item {
+  item_id?: string;
   name: string;
   quantity: number;
-  weight: number;
+  item_type: string;  // weapon, armor, consumable, quest, misc
+  weight?: number;
   description?: string;
 }
 
@@ -239,7 +241,7 @@ export interface CharacterSnapshot {
   xp: number;
   gold: number;
   level: number;
-  inventory: string[];
+  inventory: string[];  // Backend sends item names as strings currently
 }
 
 /** Token usage statistics for cost monitoring */

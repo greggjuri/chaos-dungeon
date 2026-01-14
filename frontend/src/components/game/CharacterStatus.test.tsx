@@ -25,7 +25,7 @@ describe('CharacterStatus', () => {
       constitution: 15,
       charisma: 8,
     },
-    inventory: [{ name: 'Sword', quantity: 1, weight: 5 }],
+    inventory: [{ name: 'Sword', quantity: 1, weight: 5, item_type: 'weapon' }],
     created_at: '2024-01-01T00:00:00Z',
   };
 

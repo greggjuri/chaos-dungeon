@@ -43,6 +43,7 @@ from shared.cost_limits import CostLimits
 from shared.db import DynamoDBClient, convert_floats_to_decimal
 from shared.dice import roll as roll_dice_notation
 from shared.exceptions import GameStateError, NotFoundError
+from shared.items import ITEM_CATALOG, find_item_by_name
 from shared.models import AbilityScores, Character, Item, Message, Session
 from shared.token_tracker import TokenTracker
 
@@ -282,6 +283,16 @@ class DMService:
         fled = False
         player_defending = False
         narrative = ""
+        item_used_result = None  # Track if item was used
+
+        # ========== HANDLE USE_ITEM BEFORE PLAYER TURN ==========
+        if combat_action.action_type == CombatActionType.USE_ITEM:
+            item_used_result = self._handle_use_item(
+                character, combat_action.item_id, combat_state.round
+            )
+            if item_used_result:
+                # Item was used - still proceed to enemy turn
+                new_log_entries.extend(item_used_result.get("log_entries", []))
 
         # ========== PLAYER TURN ==========
         player_attack, fled, player_defending = self.combat_resolver.resolve_player_turn(
@@ -389,11 +400,23 @@ class DMService:
 
         # ========== CONTINUE COMBAT ==========
         # Generate narrative for the round
-        narrative = self._generate_combat_narrative(
-            attack_results, character["name"], combat_enemies, session_id
-        ) if attack_results else (
-            build_defend_narrative() if player_defending else "The combatants circle warily."
-        )
+        if item_used_result:
+            # Item was used - build narrative around that
+            item_narrative = item_used_result["log_entries"][0].narrative if item_used_result.get("log_entries") else ""
+            if attack_results:
+                # Item used + enemies attacked
+                enemy_narrative = self._generate_combat_narrative(
+                    attack_results, character["name"], combat_enemies, session_id
+                )
+                narrative = f"{item_narrative}\n\n{enemy_narrative}"
+            else:
+                narrative = item_narrative
+        elif attack_results:
+            narrative = self._generate_combat_narrative(
+                attack_results, character["name"], combat_enemies, session_id
+            )
+        else:
+            narrative = build_defend_narrative() if player_defending else "The combatants circle warily."
 
         # Build log entries
         new_log_entries.extend(
@@ -605,6 +628,119 @@ class DMService:
             session_ended=session_ended,
             usage=None,
         )
+
+    def _handle_use_item(
+        self,
+        character: dict,
+        item_id: str | None,
+        combat_round: int,
+    ) -> dict | None:
+        """Handle USE_ITEM combat action.
+
+        Consumes the item and applies its effects. Currently supports
+        healing potions.
+
+        Args:
+            character: Character dict (will be modified in-place)
+            item_id: ID of item to use, or None to auto-select
+            combat_round: Current combat round number
+
+        Returns:
+            Dict with item_name, healing, log_entries, or None if no item used
+        """
+        inventory = character.get("inventory", [])
+
+        # Auto-select healing potion if no item_id provided
+        if not item_id:
+            for item in inventory:
+                if isinstance(item, dict) and item.get("item_id") == "potion_healing":
+                    item_id = "potion_healing"
+                    break
+
+        if not item_id:
+            logger.info("USE_ITEM: No usable item found")
+            return None
+
+        # Find and consume item
+        item_found = None
+        new_inventory = []
+
+        for item in inventory:
+            if isinstance(item, dict):
+                if item.get("item_id") == item_id and not item_found:
+                    item_found = item
+                    # Decrement quantity or remove
+                    qty = item.get("quantity", 1)
+                    if qty > 1:
+                        new_inventory.append({**item, "quantity": qty - 1})
+                    # else: consumed, don't add back
+                else:
+                    new_inventory.append(item)
+            else:
+                new_inventory.append(item)
+
+        if not item_found:
+            logger.warning(f"USE_ITEM: Item {item_id} not in inventory")
+            return None
+
+        character["inventory"] = new_inventory
+
+        # Apply item effect
+        item_def = ITEM_CATALOG.get(item_id)
+        result: dict = {
+            "item_name": item_found.get("name", item_id),
+            "healing": 0,
+            "log_entries": [],
+        }
+
+        if item_def and item_def.healing > 0:
+            # Healing potion - roll 1d8
+            healing_roll, _ = roll_dice_notation("1d8")
+            old_hp = character["hp"]
+            character["hp"] = min(character["max_hp"], old_hp + healing_roll)
+            actual_healing = character["hp"] - old_hp
+            result["healing"] = actual_healing
+
+            logger.info(
+                f"USE_ITEM: {item_def.name} healed {actual_healing} HP",
+                extra={
+                    "item_id": item_id,
+                    "healing_roll": healing_roll,
+                    "actual_healing": actual_healing,
+                    "hp_before": old_hp,
+                    "hp_after": character["hp"],
+                },
+            )
+
+            # Add log entry
+            result["log_entries"].append(
+                CombatLogEntry(
+                    round=combat_round,
+                    actor="player",
+                    action="use_item",
+                    target=None,
+                    roll=healing_roll,
+                    damage=None,
+                    result=f"healed_{actual_healing}",
+                    narrative=f"You drink the {item_def.name} and restore {actual_healing} HP.",
+                )
+            )
+        else:
+            logger.info(f"USE_ITEM: Used {result['item_name']} (no mechanical effect)")
+            result["log_entries"].append(
+                CombatLogEntry(
+                    round=combat_round,
+                    actor="player",
+                    action="use_item",
+                    target=None,
+                    roll=None,
+                    damage=None,
+                    result="used",
+                    narrative=f"You use the {result['item_name']}.",
+                )
+            )
+
+        return result
 
     def _build_combat_action_response(
         self,
@@ -1130,22 +1266,58 @@ class DMService:
         # Update XP
         character["xp"] = character["xp"] + state.xp_delta
 
-        # Inventory changes - handle both Item objects and strings
+        # Inventory changes - validate items through catalog
         inventory = character.get("inventory", [])
-        inventory_names = [item["name"] if isinstance(item, dict) else item for item in inventory]
+        # Track item_ids to avoid duplicates
+        inventory_ids = [
+            item.get("item_id") for item in inventory if isinstance(item, dict)
+        ]
 
         for item_name in state.inventory_add:
-            if item_name not in inventory_names:
-                inventory.append({"name": item_name, "quantity": 1, "weight": 0.0})
-                inventory_names.append(item_name)
+            # Validate item through catalog lookup
+            item_def = find_item_by_name(item_name)
+            if item_def is None:
+                logger.warning(
+                    f"DM tried to give unknown item: {item_name}",
+                    extra={"item_name": item_name},
+                )
+                continue  # Skip unknown items
+
+            # Only add if not already in inventory
+            if item_def.id not in inventory_ids:
+                inventory.append({
+                    "item_id": item_def.id,
+                    "name": item_def.name,
+                    "quantity": 1,
+                    "item_type": item_def.item_type.value,
+                    "description": item_def.description,
+                })
+                inventory_ids.append(item_def.id)
+                logger.info(
+                    f"Added item to inventory: {item_def.name}",
+                    extra={"item_id": item_def.id, "item_type": item_def.item_type.value},
+                )
 
         for item_name in state.inventory_remove:
-            # Find and remove item
-            inventory = [
-                item
-                for item in inventory
-                if (item["name"] if isinstance(item, dict) else item) != item_name
-            ]
+            # Try to find item by name or id
+            item_def = find_item_by_name(item_name)
+            target_id = item_def.id if item_def else None
+            target_name = item_name.lower()
+
+            # Find and remove item (match by id or name)
+            new_inventory = []
+            for item in inventory:
+                if isinstance(item, dict):
+                    item_id = item.get("item_id", "")
+                    item_item_name = item.get("name", "").lower()
+                    # Keep if doesn't match target
+                    if item_id != target_id and item_item_name != target_name:
+                        new_inventory.append(item)
+                else:
+                    # Legacy string format - keep if doesn't match
+                    if item.lower() != target_name:
+                        new_inventory.append(item)
+            inventory = new_inventory
 
         character["inventory"] = inventory
 

@@ -1,6 +1,7 @@
 /**
  * Game page with full chat interface and game UI.
  */
+import { useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useGameSession } from '../hooks';
 import {
@@ -10,9 +11,11 @@ import {
   CombatStatus,
   CombatUI,
   DeathScreen,
+  InventoryPanel,
   TokenCounter,
 } from '../components/game';
 import { Button, Card, Loading } from '../components';
+import { Item } from '../types';
 
 /**
  * Main game page with chat interface, character status,
@@ -20,6 +23,7 @@ import { Button, Card, Loading } from '../components';
  */
 export function GamePage() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const [showInventory, setShowInventory] = useState(false);
 
   const {
     session,
@@ -39,6 +43,21 @@ export function GamePage() {
     sendCombatAction,
     retryLoad,
   } = useGameSession(sessionId || '');
+
+  // Handle using an item from inventory (during combat)
+  const handleUseItem = useCallback(
+    (itemId: string) => {
+      sendCombatAction({ action_type: 'use_item', item_id: itemId });
+    },
+    [sendCombatAction]
+  );
+
+  // Get current inventory from character or snapshot
+  const getInventoryItems = useCallback((): Item[] => {
+    if (!character) return [];
+    // Character has full Item objects
+    return character.inventory;
+  }, [character]);
 
   // Show loading state
   if (isLoading) {
@@ -89,10 +108,34 @@ export function GamePage() {
     );
   }
 
+  const inventoryItems = getInventoryItems();
+
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] bg-gray-900">
       {/* Character status bar - sticky top */}
       <CharacterStatus character={character} snapshot={characterSnapshot} />
+
+      {/* Inventory toggle bar */}
+      <div className="bg-gray-800/50 border-b border-gray-700 px-4 py-1">
+        <button
+          onClick={() => setShowInventory(!showInventory)}
+          className="text-amber-400 hover:text-amber-300 text-sm font-medium flex items-center gap-1"
+        >
+          <span>{showInventory ? '▼' : '▶'}</span>
+          <span>Inventory ({inventoryItems.length})</span>
+        </button>
+      </div>
+
+      {/* Collapsible inventory panel */}
+      {showInventory && (
+        <div className="bg-gray-800/80 border-b border-gray-700 max-h-48 overflow-y-auto">
+          <InventoryPanel
+            items={inventoryItems}
+            inCombat={combatActive || (combat?.active ?? false)}
+            onUseItem={handleUseItem}
+          />
+        </div>
+      )}
 
       {/* Error toast */}
       {error && (

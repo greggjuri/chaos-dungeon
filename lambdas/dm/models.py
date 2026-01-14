@@ -75,6 +75,9 @@ class StateChanges(BaseModel):
     world_state: dict[str, Any] = Field(default_factory=dict)
     """Permanent world state flags to set."""
 
+    item_used: str | None = None
+    """Item that was consumed this turn."""
+
 
 class DiceRoll(BaseModel):
     """Record of a dice roll made by the DM.

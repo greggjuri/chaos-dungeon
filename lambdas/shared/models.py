@@ -38,8 +38,10 @@ class AbilityScores(BaseModel):
 class Item(BaseModel):
     """Inventory item."""
 
+    item_id: str | None = None  # References ItemDefinition.id, optional for legacy
     name: str = Field(..., min_length=1, max_length=100)
     quantity: int = Field(default=1, ge=1)
+    item_type: str = "misc"  # weapon, armor, consumable, quest, misc
     weight: float = Field(default=0.0, ge=0)
     description: str | None = None
 
