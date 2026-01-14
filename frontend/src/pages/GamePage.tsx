@@ -111,9 +111,9 @@ export function GamePage() {
   const inventoryItems = getInventoryItems();
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900 overflow-hidden">
+    <div className="flex flex-col h-screen bg-gray-900">
       {/* Fixed header section - never scrolls */}
-      <div className="flex-shrink-0 bg-gray-900 z-10">
+      <header className="flex-shrink-0 bg-gray-900 z-10">
         {/* Character status bar */}
         <CharacterStatus character={character} snapshot={characterSnapshot} />
 
@@ -145,41 +145,46 @@ export function GamePage() {
             {error}
           </div>
         )}
-      </div>
+      </header>
 
-      {/* Scrollable content area - takes remaining space */}
-      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        {/* Chat history - scrollable middle */}
-        <ChatHistory messages={messages} isLoading={isSendingAction} />
+      {/* Chat history - scrollable, takes remaining space */}
+      <ChatHistory messages={messages} isLoading={isSendingAction} />
 
-        {/* Combat UI - shown when turn-based combat is active */}
-        {combat && combat.active && (
+      {/* Combat UI - shown when turn-based combat is active */}
+      {combat && combat.active && (
+        <div className="flex-shrink-0">
           <CombatUI
             combat={combat}
             onAction={sendCombatAction}
             isLoading={isSendingAction}
           />
-        )}
+        </div>
+      )}
 
-        {/* Legacy combat status - shown when combat active but no turn-based UI */}
-        {combatActive && (!combat || !combat.active) && (
+      {/* Legacy combat status - shown when combat active but no turn-based UI */}
+      {combatActive && (!combat || !combat.active) && (
+        <div className="flex-shrink-0">
           <CombatStatus enemies={enemies} combatActive={combatActive} />
-        )}
+        </div>
+      )}
 
-        {/* Death screen - shown inline at bottom when character dies */}
-        {characterDead && (
+      {/* Death screen - shown inline at bottom when character dies */}
+      {characterDead && (
+        <div className="flex-shrink-0">
           <DeathScreen character={character} snapshot={characterSnapshot} />
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Action input - always shown when not dead (can type during combat too) */}
+      {/* Action input - fixed at bottom, shown when not dead */}
       {!characterDead && (
-        <ActionInput
-          onSend={sendAction}
-          disabled={sessionEnded}
-          isLoading={isSendingAction}
-          placeholder={combat?.active ? 'Type action or use buttons above...' : 'What do you do?'}
-        />
+        <div className="flex-shrink-0">
+          <ActionInput
+            onSend={sendAction}
+            disabled={sessionEnded}
+            isLoading={isSendingAction}
+            placeholder={combat?.active ? 'Type action or use buttons above...' : 'What do you do?'}
+          />
+        </div>
       )}
 
       {/* Token counter overlay - toggle with 'T' key */}
