@@ -177,8 +177,10 @@ export function GamePage() {
         )}
       </header>
 
-      {/* Chat history - scrollable, takes remaining space */}
-      <ChatHistory messages={messages} isLoading={isSendingAction} />
+      {/* Scroll containment wrapper - flex-1 min-h-0 is critical for proper containment */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <ChatHistory messages={messages} isLoading={isSendingAction} />
+      </div>
 
       {/* Combat UI - shown when turn-based combat is active */}
       {combat && combat.active && (
