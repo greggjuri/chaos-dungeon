@@ -24,16 +24,18 @@ SEARCH_PATTERNS = [
 SELL_PATTERNS = [
     r"\bsell\b",
     r"\btrade\b.*\bfor\b.*\bgold\b",
-    r"\bexchange\b.*\bfor\b.*\b(gold|coin)\b",
+    r"\bexchange\b.*\bfor\b.*\b(gold|coins?)\b",
     r"\bpawn\b",
+    r"\bget\s+(rid\s+of|gold\s+for)\b",
+    r"\bgive\b.*\bfor\b.*\b(gold|coins?|money)\b",
 ]
 
 # Patterns to detect buy attempts
+# NOTE: "acquire" removed - too ambiguous ("acquire gold for my item" = sell)
 BUY_PATTERNS = [
     r"\bbuy\b",
     r"\bpurchase\b",
     r"\bpay\b.*\bfor\b",
-    r"\bacquire\b",
     r"\bget\b.*\bfrom\b.*\b(shop|merchant|vendor|store)\b",
 ]
 

@@ -12,6 +12,13 @@ None currently.
 
 ## Recently Completed
 
+### Commerce Lockdown (prp-18d)
+- [x] Block ALL gold_delta (positive AND negative) from DM
+- [x] Block ALL inventory_remove from DM
+- [x] Updated DM prompts with clearer authority instructions
+- [x] Removed ambiguous "acquire" from BUY_PATTERNS
+- [x] Added new sell patterns (get rid of, give for gold/coins/money)
+
 ### Commerce System (prp-18c)
 - [x] Server-side buy/sell transactions via commerce_sell and commerce_buy fields
 - [x] DM prompts with commerce instructions and context injection
@@ -135,4 +142,4 @@ Comprehensive lockdown of item/gold acquisition:
 
 ---
 
-*Last updated: 2026-01-15 (commerce system PRP-18c complete)*
+*Last updated: 2026-01-15 (commerce lockdown PRP-18d complete)*

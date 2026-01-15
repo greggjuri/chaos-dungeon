@@ -118,17 +118,29 @@ class TestDMGrantBlocking:
 
         assert state.inventory_add == []
 
-    def test_dm_gold_spending_allowed(self):
-        """DM gold_delta < 0 (spending) should still work."""
+    def test_dm_negative_gold_delta_blocked(self):
+        """DM gold_delta < 0 (spending) is now blocked too."""
         from dm.models import StateChanges
 
         state = StateChanges(gold_delta=-10)
 
-        # Spending is not blocked
-        if state.gold_delta > 0:
+        # ALL gold_delta is blocked (use commerce_sell/commerce_buy)
+        if state.gold_delta != 0:
             state.gold_delta = 0
 
-        assert state.gold_delta == -10
+        assert state.gold_delta == 0
+
+    def test_dm_inventory_remove_blocked(self):
+        """DM inventory_remove should be blocked."""
+        from dm.models import StateChanges
+
+        state = StateChanges(inventory_remove=["torch", "shield"])
+
+        # Block all inventory removals
+        if state.inventory_remove:
+            state.inventory_remove = []
+
+        assert state.inventory_remove == []
 
     def test_dm_hp_changes_allowed(self):
         """DM hp_delta should still work (both positive and negative)."""
@@ -314,3 +326,31 @@ class TestContextLootFormatting:
         })
 
         assert "SERVER handles" in result or "server handles" in result.lower()
+
+
+class TestNewSellPatterns:
+    """Test new sell patterns added in PRP-18d."""
+
+    @pytest.mark.parametrize(
+        "action",
+        [
+            "I want to get rid of this torch",
+            "get gold for my sword",
+            "I'll give you my shield for gold",
+            "give the merchant my dagger for coins",
+            "I give my armor for money",
+        ],
+    )
+    def test_new_sell_patterns_detected(self, action: str):
+        """New sell patterns should be detected."""
+        from shared.actions import is_sell_action
+
+        assert is_sell_action(action) is True
+
+    def test_acquire_no_longer_triggers_buy(self):
+        """'acquire' should NOT trigger buy detection (ambiguous)."""
+        from shared.actions import is_buy_action
+
+        # "acquire" was removed from BUY_PATTERNS
+        assert is_buy_action("I'd like to acquire some armor") is False
+        assert is_buy_action("acquire gold for my item") is False

@@ -72,13 +72,13 @@ class TestCommerceDetection:
         "I want to buy a sword",
         "purchase some rations",
         "I'll pay for a healing potion",
-        "I'd like to acquire some armor",
         "Buy me a torch",
         "I purchase the dagger",
         "I get a shield from the merchant",
     ])
     def test_buy_patterns_detected(self, action):
         """Buy patterns are detected correctly."""
+        # NOTE: "acquire" was removed - too ambiguous
         assert is_buy_action(action) is True
 
     @pytest.mark.parametrize("action", [

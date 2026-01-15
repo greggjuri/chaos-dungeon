@@ -1604,16 +1604,16 @@ class DMService:
             logger.warning("Commerce error", extra={"error": commerce_result["error"]})
 
         # ============================================================
-        # ABSOLUTE BLOCK: DM CANNOT GRANT GOLD OR ITEMS DIRECTLY
-        # All resource acquisition must go through server-controlled
-        # channels (combat loot claim, commerce, quests)
+        # ABSOLUTE BLOCK: DM CANNOT MODIFY GOLD OR ITEMS DIRECTLY
+        # All resource changes must go through server-controlled
+        # channels (commerce_sell, commerce_buy, _claim_pending_loot)
         # ============================================================
-        if state.gold_delta > 0:
+        if state.gold_delta != 0:
             logger.warning(
-                "BLOCKED: DM attempted unauthorized gold grant",
-                extra={"attempted": state.gold_delta},
+                "COMMERCE: Blocked gold_delta - use commerce_sell/commerce_buy",
+                extra={"blocked_delta": state.gold_delta},
             )
-            state.gold_delta = 0  # Block positive gold grants
+            state.gold_delta = 0  # Block ALL gold changes
 
         if state.inventory_add:
             logger.warning(
@@ -1622,40 +1622,25 @@ class DMService:
             )
             state.inventory_add = []  # Block all item adds
 
+        if state.inventory_remove:
+            logger.warning(
+                "COMMERCE: Blocked inventory_remove - use commerce_sell",
+                extra={"blocked_items": state.inventory_remove},
+            )
+            state.inventory_remove = []  # Block all item removals
+
         # Update character HP with bounds
         new_hp = character["hp"] + state.hp_delta
         character["hp"] = max(0, min(new_hp, character["max_hp"]))
 
-        # Gold spending (negative delta) is still allowed
-        if state.gold_delta < 0:
-            character["gold"] = max(0, character["gold"] + state.gold_delta)
-
         # Update XP
         character["xp"] = character["xp"] + state.xp_delta
 
-        # Inventory: only removals are processed (adds blocked above)
-        inventory = character.get("inventory", [])
-
-        for item_name in state.inventory_remove:
-            idx = self._find_inventory_item_index(inventory, item_name)
-            if idx is not None:
-                item = inventory[idx]
-                if isinstance(item, dict):
-                    qty = item.get("quantity", 1)
-                    if qty > 1:
-                        inventory[idx]["quantity"] = qty - 1
-                        logger.info(f"Decremented {item_name} quantity to {qty - 1}")
-                    else:
-                        inventory.pop(idx)
-                        logger.info(f"Removed {item_name} from inventory")
-                else:
-                    # Legacy string format
-                    inventory.pop(idx)
-                    logger.info(f"Removed {item_name} from inventory (legacy)")
-            else:
-                logger.warning(f"Tried to remove item not in inventory: {item_name}")
-
-        character["inventory"] = inventory
+        # NOTE: Inventory changes are now fully blocked from DM
+        # All item adds/removes happen through authorized channels:
+        # - commerce_sell / commerce_buy (processed above)
+        # - _claim_pending_loot() (combat victory)
+        # - _handle_use_item() (combat item usage)
 
         # Update session location
         if state.location:

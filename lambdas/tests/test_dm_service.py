@@ -168,8 +168,8 @@ class TestApplyStateChanges:
         # DM cannot grant gold - server controls all acquisition
         assert char["gold"] == 100  # Unchanged
 
-    def test_gold_delta_negative(self, service, sample_character, sample_session):
-        """Gold should decrease with negative delta."""
+    def test_gold_delta_negative_blocked(self, service, sample_character, sample_session):
+        """Negative gold_delta should be blocked (use commerce_sell/commerce_buy)."""
         dm_response = DMResponse(
             narrative="Paid",
             state_changes=StateChanges(gold_delta=-30),
@@ -177,10 +177,11 @@ class TestApplyStateChanges:
 
         char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
-        assert char["gold"] == 70
+        # DM cannot modify gold - use commerce_sell/commerce_buy
+        assert char["gold"] == 100  # Unchanged
 
-    def test_gold_cannot_go_negative(self, service, sample_character, sample_session):
-        """Gold should not go below 0."""
+    def test_gold_delta_large_negative_blocked(self, service, sample_character, sample_session):
+        """Large negative gold_delta should also be blocked."""
         dm_response = DMResponse(
             narrative="Robbed!",
             state_changes=StateChanges(gold_delta=-1000),
@@ -188,7 +189,8 @@ class TestApplyStateChanges:
 
         char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
-        assert char["gold"] == 0
+        # DM cannot modify gold - all gold changes via authorized channels
+        assert char["gold"] == 100  # Unchanged
 
     def test_xp_delta(self, service, sample_character, sample_session):
         """XP should accumulate."""
@@ -256,8 +258,8 @@ class TestApplyStateChanges:
         # DM cannot grant ANY items - quest items must come from server systems
         assert len(char["inventory"]) == original_count
 
-    def test_inventory_remove(self, service, sample_character, sample_session):
-        """Items should be removed from inventory."""
+    def test_inventory_remove_blocked(self, service, sample_character, sample_session):
+        """inventory_remove should be BLOCKED (use commerce_sell)."""
         dm_response = DMResponse(
             narrative="Used!",
             state_changes=StateChanges(inventory_remove=["Shield"]),
@@ -265,82 +267,22 @@ class TestApplyStateChanges:
 
         char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
+        # DM cannot remove items - use commerce_sell
         inventory_names = [item["name"] for item in char["inventory"]]
-        assert "Shield" not in inventory_names
-        assert "Sword" in inventory_names
-
-    def test_inventory_remove_nonexistent(self, service, sample_character, sample_session):
-        """Removing nonexistent items should not raise error."""
-        dm_response = DMResponse(
-            narrative="Lost!",
-            state_changes=StateChanges(inventory_remove=["NonexistentItem"]),
-        )
-
-        # Should not raise
-        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
-
+        assert "Shield" in inventory_names  # Still there (blocked)
         assert len(char["inventory"]) == 2  # Unchanged
 
-    def test_inventory_remove_case_insensitive(self, service, sample_character, sample_session):
-        """'shield' (lowercase) should remove 'Shield' (title case) from inventory."""
+    def test_inventory_remove_multiple_blocked(self, service, sample_character, sample_session):
+        """Multiple inventory_remove items should all be blocked."""
         dm_response = DMResponse(
-            narrative="Dropped!",
-            state_changes=StateChanges(inventory_remove=["shield"]),  # lowercase
+            narrative="Lost!",
+            state_changes=StateChanges(inventory_remove=["Shield", "Sword"]),
         )
 
         char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
-        inventory_names = [item["name"] for item in char["inventory"]]
-        assert "Shield" not in inventory_names
-        assert len(char["inventory"]) == 1  # Only Sword remains
-
-    def test_inventory_remove_by_item_id(self, service, sample_character, sample_session):
-        """Should be able to remove item by item_id."""
-        dm_response = DMResponse(
-            narrative="Dropped!",
-            state_changes=StateChanges(inventory_remove=["sword"]),  # item_id not name
-        )
-
-        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
-
-        inventory_ids = [item["item_id"] for item in char["inventory"]]
-        assert "sword" not in inventory_ids
-        assert len(char["inventory"]) == 1  # Only Shield remains
-
-    def test_inventory_remove_decrements_quantity(self, service, sample_character, sample_session):
-        """Removing from qty > 1 should decrement quantity instead of removing item."""
-        # Add item with quantity 7
-        sample_character["inventory"].append({
-            "item_id": "rations",
-            "name": "Rations",
-            "quantity": 7,
-            "item_type": "consumable",
-            "description": "A week's worth of trail rations.",
-        })
-
-        dm_response = DMResponse(
-            narrative="Ate some rations",
-            state_changes=StateChanges(inventory_remove=["rations"]),
-        )
-
-        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
-
-        # Should still have rations but with qty 6
-        rations = next((i for i in char["inventory"] if i["item_id"] == "rations"), None)
-        assert rations is not None
-        assert rations["quantity"] == 6
-
-    def test_inventory_remove_at_quantity_one(self, service, sample_character, sample_session):
-        """Removing at qty 1 should remove the item entirely."""
-        dm_response = DMResponse(
-            narrative="Dropped!",
-            state_changes=StateChanges(inventory_remove=["Sword"]),
-        )
-
-        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
-
-        inventory_ids = [item["item_id"] for item in char["inventory"]]
-        assert "sword" not in inventory_ids
+        # DM cannot remove ANY items
+        assert len(char["inventory"]) == 2  # Unchanged
 
     def test_location_update(self, service, sample_character, sample_session):
         """Location should be updated."""
