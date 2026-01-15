@@ -1,7 +1,7 @@
 /**
  * Game page with full chat interface and game UI.
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useGameSession } from '../hooks';
 import {
@@ -25,6 +25,26 @@ export function GamePage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const [showInventory, setShowInventory] = useState(false);
   const [inventoryHeight, setInventoryHeight] = useState(200);
+
+  // Prevent document-level scrolling on game page
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+
+    // Save original values
+    const originalHtmlOverflow = html.style.overflow;
+    const originalBodyOverflow = body.style.overflow;
+
+    // Disable scrolling
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+
+    return () => {
+      // Restore on unmount
+      html.style.overflow = originalHtmlOverflow;
+      body.style.overflow = originalBodyOverflow;
+    };
+  }, []);
 
   const {
     session,
