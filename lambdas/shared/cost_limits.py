@@ -17,7 +17,7 @@ class CostLimits:
 
     # Per-session daily limit (single user session)
     # Prevents one user from consuming entire budget
-    SESSION_DAILY_TOKENS: int = 50_000
+    SESSION_DAILY_TOKENS: int = 80_000
 
     # Per-request output limit (sanity check)
     MAX_OUTPUT_TOKENS: int = 2_000

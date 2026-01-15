@@ -114,7 +114,7 @@ Comprehensive lockdown of item/gold acquisition:
 - MAX_SESSIONS_PER_USER: 15
 - MAX_MESSAGE_HISTORY: 50
 - GLOBAL_DAILY_TOKENS: 500,000
-- SESSION_DAILY_TOKENS: 50,000
+- SESSION_DAILY_TOKENS: 80,000
 
 ### Cost Tracking
 - Current estimated monthly: ~$5-10 (Mistral Small + AWS)
