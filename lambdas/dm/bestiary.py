@@ -20,6 +20,7 @@ BESTIARY: dict[str, dict] = {
         "attack_bonus": 1,
         "damage_dice": "1d6",
         "xp_value": 10,
+        "loot_table": "goblin",
     },
     "skeleton": {
         "name": "Skeleton",
@@ -28,6 +29,7 @@ BESTIARY: dict[str, dict] = {
         "attack_bonus": 1,
         "damage_dice": "1d6",
         "xp_value": 15,
+        "loot_table": "skeleton",
     },
     "giant rat": {
         "name": "Giant Rat",
@@ -36,6 +38,7 @@ BESTIARY: dict[str, dict] = {
         "attack_bonus": 0,
         "damage_dice": "1d3",
         "xp_value": 5,
+        "loot_table": "giant_rat",
     },
     "kobold": {
         "name": "Kobold",
@@ -44,6 +47,7 @@ BESTIARY: dict[str, dict] = {
         "attack_bonus": 0,
         "damage_dice": "1d4",
         "xp_value": 5,
+        "loot_table": "kobold",
     },
     # Medium enemies (levels 2-4)
     "orc": {
@@ -53,6 +57,7 @@ BESTIARY: dict[str, dict] = {
         "attack_bonus": 2,
         "damage_dice": "1d8",
         "xp_value": 25,
+        "loot_table": "orc",
     },
     "zombie": {
         "name": "Zombie",
@@ -61,6 +66,7 @@ BESTIARY: dict[str, dict] = {
         "attack_bonus": 1,
         "damage_dice": "1d8",
         "xp_value": 20,
+        "loot_table": "zombie",
     },
     "wolf": {
         "name": "Wolf",
@@ -69,6 +75,7 @@ BESTIARY: dict[str, dict] = {
         "attack_bonus": 2,
         "damage_dice": "1d6",
         "xp_value": 25,
+        "loot_table": "wolf",
     },
     "hobgoblin": {
         "name": "Hobgoblin",
@@ -77,6 +84,7 @@ BESTIARY: dict[str, dict] = {
         "attack_bonus": 2,
         "damage_dice": "1d8",
         "xp_value": 30,
+        "loot_table": "hobgoblin",
     },
     # Tougher enemies (levels 3-5)
     "giant spider": {
@@ -86,6 +94,7 @@ BESTIARY: dict[str, dict] = {
         "attack_bonus": 2,
         "damage_dice": "1d6",
         "xp_value": 50,
+        "loot_table": "giant_spider",
     },
     "ghoul": {
         "name": "Ghoul",
@@ -94,6 +103,7 @@ BESTIARY: dict[str, dict] = {
         "attack_bonus": 2,
         "damage_dice": "1d4",
         "xp_value": 50,
+        "loot_table": "ghoul",
     },
     "bugbear": {
         "name": "Bugbear",
@@ -102,6 +112,7 @@ BESTIARY: dict[str, dict] = {
         "attack_bonus": 3,
         "damage_dice": "2d4",
         "xp_value": 75,
+        "loot_table": "bugbear",
     },
     "ogre": {
         "name": "Ogre",
@@ -110,6 +121,7 @@ BESTIARY: dict[str, dict] = {
         "attack_bonus": 4,
         "damage_dice": "1d10",
         "xp_value": 125,
+        "loot_table": "ogre",
     },
     # Dangerous enemies (levels 5+)
     "troll": {
@@ -119,6 +131,7 @@ BESTIARY: dict[str, dict] = {
         "attack_bonus": 5,
         "damage_dice": "1d8+2",
         "xp_value": 350,
+        "loot_table": "troll",
     },
     "wight": {
         "name": "Wight",
@@ -127,6 +140,7 @@ BESTIARY: dict[str, dict] = {
         "attack_bonus": 3,
         "damage_dice": "1d6",
         "xp_value": 100,
+        "loot_table": "wight",
     },
     "wraith": {
         "name": "Wraith",
@@ -135,6 +149,7 @@ BESTIARY: dict[str, dict] = {
         "attack_bonus": 4,
         "damage_dice": "1d6",
         "xp_value": 200,
+        "loot_table": "wraith",
     },
     # Boss-tier enemies (extremely dangerous)
     "vampire": {
@@ -144,6 +159,7 @@ BESTIARY: dict[str, dict] = {
         "attack_bonus": 8,
         "damage_dice": "1d10+4",
         "xp_value": 1000,
+        "loot_table": "vampire",
     },
     "dragon": {
         "name": "Dragon",
@@ -152,6 +168,7 @@ BESTIARY: dict[str, dict] = {
         "attack_bonus": 10,
         "damage_dice": "2d8+4",
         "xp_value": 2000,
+        "loot_table": "dragon",
     },
 }
 

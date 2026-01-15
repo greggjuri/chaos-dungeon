@@ -7,14 +7,13 @@ None currently.
 
 ### Up Next
 - [ ] init-17-player-agency.md - DM prompt fixes for player agency (stop moral railroading on dark actions)
-- [ ] init-18-loot-tables.md - Server-controlled loot system with BECMI-style loot tables
+- [ ] init-19-shops.md - Gold-based item purchases from merchants
 
 ---
 
 ## Backlog
 
 ### Phase 3 - Game Systems (Prioritized)
-- [ ] init-18-loot-tables.md - Loot tables, pre-rolled loot on combat victory, named NPC/location registry
 - [ ] init-19-shops.md - Gold-based item purchases from merchants
 - [ ] init-11-dice-rolling.md - Dice mechanics with UI display
 - [ ] init-12-leveling.md - XP and level progression
@@ -69,6 +68,9 @@ None currently.
 - [x] prp-16g-chathistory-scroll-fix.md - Move scroll to wrapper, ChatHistory fills with h-full
 - [x] prp-16h-document-scroll-fix.md - Prevent document-level scrolling with useEffect
 
+### Loot System
+- [x] prp-18-loot-tables.md - BECMI-style loot tables, pending loot on victory, server validation
+
 ---
 
 ## Architecture Decisions
@@ -85,12 +87,14 @@ None currently.
 3. **Document can scroll independently** - Must set overflow:hidden on html/body to prevent
 4. **DevTools is essential** - getBoundingClientRect() and scrollTop reveal true state
 
-### Planned: Loot Table System (init-18+)
-Instead of DM freely giving items:
-- Pre-roll loot when combat ends / rooms entered
-- Named NPCs/locations have fixed or table-rolled inventories
-- Player must "search" to claim pre-rolled loot
-- Prevents item wishing, maintains game balance
+### Implemented: Loot Table System (prp-18)
+Server-controlled loot replaces free-form item giving:
+- BECMI-style weighted loot tables for all bestiary enemies
+- Loot rolled on combat victory, stored as pending_loot
+- Player must "search" to claim loot (DM prompted in context)
+- Gold and items validated against pending loot
+- Unclaimed loot lost when new combat starts
+- Positive constraints: DM told what loot exists, not what to avoid
 
 ---
 
@@ -109,8 +113,7 @@ Instead of DM freely giving items:
 
 ### Known Issues
 - DM sometimes overrides player agency on dark/violent actions (init-17 will fix)
-- Need proper loot system to prevent item wishing (init-18 will fix)
 
 ---
 
-*Last updated: 2026-01-15 (layout fixes PRPs 16d-16h complete)*
+*Last updated: 2026-01-15 (loot system PRP-18 complete)*

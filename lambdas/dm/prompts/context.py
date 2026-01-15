@@ -1,5 +1,6 @@
 """Dynamic context builder for the DM."""
 
+from shared.items import ITEM_CATALOG
 from shared.models import Character, Message, MessageRole, Session
 from shared.utils import calculate_modifier
 
@@ -31,6 +32,7 @@ class DMPromptBuilder:
         self,
         character: Character,
         session: Session,
+        session_data: dict | None = None,
     ) -> str:
         """Build the dynamic context section (~500-800 tokens).
 
@@ -38,10 +40,12 @@ class DMPromptBuilder:
         - Character stats block
         - Current location and world state
         - Recent message history (last 10 messages)
+        - Pending loot info (if any)
 
         Args:
             character: Current player character
             session: Current game session
+            session_data: Optional raw session dict for pending_loot access
 
         Returns:
             Context string to append after system prompt
@@ -51,6 +55,13 @@ class DMPromptBuilder:
             self._format_world_state(session),
             self._format_message_history(session.message_history),
         ]
+
+        # Add loot context if there's pending loot
+        if session_data:
+            loot_context = self._format_pending_loot(session_data)
+            if loot_context:
+                parts.append(loot_context)
+
         return "\n\n".join(parts)
 
     def build_user_message(self, action: str) -> str:
@@ -150,5 +161,59 @@ World State: {flags}"""
         for msg in recent:
             role = "Player" if msg.role == MessageRole.PLAYER else "DM"
             lines.append(f"[{role}]: {msg.content}")
+
+        return "\n".join(lines)
+
+    def _format_pending_loot(self, session_data: dict) -> str:
+        """Format pending loot info for DM context.
+
+        Args:
+            session_data: Raw session dict containing pending_loot
+
+        Returns:
+            Formatted loot context block, or empty string if no loot
+        """
+        pending = session_data.get("pending_loot")
+        if not pending:
+            return ""
+
+        gold = pending.get("gold", 0)
+        items = pending.get("items", [])
+
+        if not gold and not items:
+            return ""
+
+        lines = [
+            "## LOOT AVAILABLE",
+            "The player has defeated enemies. Loot is available to claim:",
+        ]
+
+        if gold > 0:
+            lines.append(f"- Gold: {gold}")
+
+        if items:
+            # Convert item IDs to display names
+            item_names = []
+            for item_id in items:
+                if item_id in ITEM_CATALOG:
+                    item_names.append(ITEM_CATALOG[item_id].name)
+                else:
+                    item_names.append(item_id.replace("_", " ").title())
+            lines.append(f"- Items: {', '.join(item_names)}")
+
+        lines.extend([
+            "",
+            "IMPORTANT: Prompt the player to search the bodies.",
+            "Accept variations like: 'search', 'loot', 'check bodies', 'take their stuff'",
+            "When player searches, output state changes:",
+        ])
+        if gold > 0:
+            lines.append(f"  gold_delta: +{gold}")
+        if items:
+            lines.append(f"  inventory_add: {items}")
+        lines.extend([
+            "Do NOT give loot until player explicitly searches.",
+            "If player declines, acknowledge their choice - loot remains available.",
+        ])
 
         return "\n".join(lines)

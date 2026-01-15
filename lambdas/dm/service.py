@@ -44,6 +44,7 @@ from shared.db import DynamoDBClient, convert_floats_to_decimal
 from shared.dice import roll as roll_dice_notation
 from shared.exceptions import GameStateError, NotFoundError
 from shared.items import ITEM_CATALOG, InventoryItem, find_item_by_name
+from shared.loot import roll_combat_loot
 from shared.models import AbilityScores, Character, Item, Message, Session
 from shared.token_tracker import TokenTracker
 
@@ -551,6 +552,17 @@ class DMService:
         Returns:
             ActionResponse with combat end state
         """
+        # Roll loot on victory
+        if victory:
+            combat_enemies_data = session.get("combat_enemies", [])
+            pending_loot = roll_combat_loot(combat_enemies_data)
+            if pending_loot["gold"] > 0 or pending_loot["items"]:
+                session["pending_loot"] = pending_loot
+                logger.info(
+                    "Pending loot set",
+                    extra={"loot": pending_loot}
+                )
+
         # Apply XP
         character["xp"] += xp_gained
 
@@ -978,7 +990,7 @@ class DMService:
             message_history=[Message(**m) for m in session.get("message_history", [])],
         )
 
-        context = self.prompt_builder.build_context(char_model, sess_model)
+        context = self.prompt_builder.build_context(char_model, sess_model, session)
 
         # Call Claude
         client = self._get_ai_client()
@@ -1137,6 +1149,14 @@ class DMService:
             session: Session dict to update
             enemies: Enemies from Claude's response
         """
+        # Clear any unclaimed loot from previous combat
+        if session.get("pending_loot"):
+            logger.info(
+                "Unclaimed loot lost on new combat",
+                extra={"loot": session["pending_loot"]}
+            )
+            session["pending_loot"] = None
+
         logger.info(
             "Initiating combat",
             extra={
@@ -1307,23 +1327,40 @@ class DMService:
             Updated (character, session) tuple
         """
         state = dm_response.state_changes
+        pending = session.get("pending_loot")
 
         # Update character HP with bounds
         new_hp = character["hp"] + state.hp_delta
         character["hp"] = max(0, min(new_hp, character["max_hp"]))
 
-        # Update gold (can't go negative)
-        character["gold"] = max(0, character["gold"] + state.gold_delta)
+        # Validate and update gold
+        gold_delta = state.gold_delta
+        if pending and gold_delta > 0:
+            # Validate gold claim against pending loot
+            available_gold = pending.get("gold", 0)
+            if gold_delta > available_gold:
+                logger.warning(
+                    "DM tried to give more gold than pending",
+                    extra={"requested": gold_delta, "available": available_gold}
+                )
+                gold_delta = available_gold
+            # Reduce pending gold
+            pending["gold"] = available_gold - gold_delta
+
+        character["gold"] = max(0, character["gold"] + gold_delta)
 
         # Update XP
         character["xp"] = character["xp"] + state.xp_delta
 
-        # Inventory changes - validate items through catalog
+        # Inventory changes - validate items through catalog AND pending loot
         inventory = character.get("inventory", [])
         # Track item_ids to avoid duplicates
         inventory_ids = [
             item.get("item_id") for item in inventory if isinstance(item, dict)
         ]
+
+        # Get pending items as a mutable list for validation
+        pending_items = list(pending.get("items", [])) if pending else []
 
         for item_name in state.inventory_add:
             # Validate item through catalog lookup
@@ -1334,6 +1371,18 @@ class DMService:
                     extra={"item_name": item_name},
                 )
                 continue  # Skip unknown items
+
+            # Validate against pending loot if present
+            if pending and pending_items:
+                if item_def.id in pending_items:
+                    # Valid claim - remove from pending
+                    pending_items.remove(item_def.id)
+                else:
+                    logger.warning(
+                        "DM tried to give item not in pending loot",
+                        extra={"item": item_name, "pending": pending_items}
+                    )
+                    continue  # Skip items not in pending loot
 
             # Check if item already in inventory
             existing_idx = None
@@ -1364,6 +1413,16 @@ class DMService:
                     f"Added item to inventory: {item_def.name}",
                     extra={"item_id": item_def.id, "item_type": item_def.item_type.value},
                 )
+
+        # Update pending items list
+        if pending:
+            pending["items"] = pending_items
+            # Clear pending_loot if empty
+            if pending.get("gold", 0) <= 0 and not pending.get("items"):
+                session["pending_loot"] = None
+                logger.info("All pending loot claimed")
+            else:
+                session["pending_loot"] = pending
 
         for item_name in state.inventory_remove:
             idx = self._find_inventory_item_index(inventory, item_name)
