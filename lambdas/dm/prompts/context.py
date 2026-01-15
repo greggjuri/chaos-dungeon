@@ -167,25 +167,30 @@ World State: {flags}"""
     def _format_pending_loot(self, session_data: dict) -> str:
         """Format pending loot info for DM context.
 
+        The DM's role is NARRATIVE ONLY - the server handles actual loot claiming.
+
         Args:
             session_data: Raw session dict containing pending_loot
 
         Returns:
-            Formatted loot context block, or empty string if no loot
+            Formatted loot context block, or no-loot context if empty
         """
         pending = session_data.get("pending_loot")
+
+        # If no pending loot, return NO LOOT context
         if not pending:
-            return ""
+            return self._format_no_loot_context()
 
         gold = pending.get("gold", 0)
         items = pending.get("items", [])
 
+        # If pending exists but is empty, return NO LOOT context
         if not gold and not items:
-            return ""
+            return self._format_no_loot_context()
 
         lines = [
             "## LOOT AVAILABLE",
-            "The player has defeated enemies. Loot is available to claim:",
+            "The player has defeated enemies. Loot is available:",
         ]
 
         if gold > 0:
@@ -203,17 +208,25 @@ World State: {flags}"""
 
         lines.extend([
             "",
-            "IMPORTANT: Prompt the player to search the bodies.",
-            "Accept variations like: 'search', 'loot', 'check bodies', 'take their stuff'",
-            "When player searches, output state changes:",
-        ])
-        if gold > 0:
-            lines.append(f"  gold_delta: +{gold}")
-        if items:
-            lines.append(f"  inventory_add: {items}")
-        lines.extend([
+            "When the player searches (variations: 'search', 'loot', 'check bodies', 'take their stuff'):",
+            "- Narrate them finding these items",
+            "- The SERVER handles adding items to inventory (you do NOT output gold_delta or inventory_add)",
+            "",
             "Do NOT give loot until player explicitly searches.",
-            "If player declines, acknowledge their choice - loot remains available.",
+            "If player declines to search, acknowledge their choice.",
         ])
 
         return "\n".join(lines)
+
+    def _format_no_loot_context(self) -> str:
+        """Format context when no loot is available.
+
+        Tells the DM to narrate finding nothing when player searches.
+
+        Returns:
+            Formatted no-loot context block
+        """
+        return """## NO LOOT AVAILABLE
+There is no loot available in this area.
+If the player searches, narrate them finding nothing of value.
+Do NOT invent items or gold - the server controls all acquisition."""

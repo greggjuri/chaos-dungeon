@@ -156,8 +156,8 @@ class TestApplyStateChanges:
 
         assert char["hp"] == 0
 
-    def test_gold_delta_positive(self, service, sample_character, sample_session):
-        """Gold should increase with positive delta."""
+    def test_gold_delta_positive_blocked(self, service, sample_character, sample_session):
+        """Positive gold delta from DM should be BLOCKED (item authority)."""
         dm_response = DMResponse(
             narrative="Loot!",
             state_changes=StateChanges(gold_delta=50),
@@ -165,7 +165,8 @@ class TestApplyStateChanges:
 
         char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
-        assert char["gold"] == 150
+        # DM cannot grant gold - server controls all acquisition
+        assert char["gold"] == 100  # Unchanged
 
     def test_gold_delta_negative(self, service, sample_character, sample_session):
         """Gold should decrease with negative delta."""
@@ -200,33 +201,37 @@ class TestApplyStateChanges:
 
         assert char["xp"] == 100
 
-    def test_inventory_add_valid_item(self, service, sample_character, sample_session):
-        """Valid catalog items should be added to inventory."""
+    def test_inventory_add_blocked(self, service, sample_character, sample_session):
+        """All inventory_add from DM should be BLOCKED (item authority)."""
         dm_response = DMResponse(
             narrative="Found!",
             state_changes=StateChanges(inventory_add=["Potion of Healing", "Rusty Key"]),
         )
 
+        original_count = len(sample_character["inventory"])
         char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
+        # DM cannot grant items - server controls all acquisition
+        assert len(char["inventory"]) == original_count  # Unchanged
         inventory_ids = [item["item_id"] for item in char["inventory"]]
-        assert "potion_healing" in inventory_ids
-        assert "rusty_key" in inventory_ids
+        assert "potion_healing" not in inventory_ids
+        assert "rusty_key" not in inventory_ids
 
-    def test_inventory_add_with_alias(self, service, sample_character, sample_session):
-        """Items via alias should be added correctly."""
+    def test_inventory_add_blocked_with_alias(self, service, sample_character, sample_session):
+        """All inventory_add from DM should be BLOCKED regardless of name format."""
         dm_response = DMResponse(
             narrative="Found a healing potion!",
             state_changes=StateChanges(inventory_add=["healing potion"]),
         )
 
+        original_count = len(sample_character["inventory"])
         char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
-        inventory_ids = [item["item_id"] for item in char["inventory"]]
-        assert "potion_healing" in inventory_ids
+        # DM cannot grant items
+        assert len(char["inventory"]) == original_count
 
-    def test_inventory_add_unknown_item_skipped(self, service, sample_character, sample_session):
-        """Unknown items should be skipped with a warning."""
+    def test_inventory_add_blocked_unknown_item(self, service, sample_character, sample_session):
+        """Unknown items from DM should also be blocked."""
         dm_response = DMResponse(
             narrative="Found!",
             state_changes=StateChanges(inventory_add=["Vorpal Blade", "Dagger"]),
@@ -235,35 +240,20 @@ class TestApplyStateChanges:
         original_count = len(sample_character["inventory"])
         char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
-        # Vorpal Blade is unknown, should be skipped
-        # Dagger is valid, should be added
-        assert len(char["inventory"]) == original_count + 1
-        inventory_ids = [item["item_id"] for item in char["inventory"]]
-        assert "dagger" in inventory_ids
+        # DM cannot grant ANY items
+        assert len(char["inventory"]) == original_count
 
-    def test_inventory_add_dynamic_quest_item(self, service, sample_character, sample_session):
-        """Quest items with keywords should be created dynamically."""
+    def test_inventory_add_blocked_quest_item(self, service, sample_character, sample_session):
+        """Quest items from DM should also be blocked."""
         dm_response = DMResponse(
             narrative="Found!",
             state_changes=StateChanges(inventory_add=["Ornate Locket"]),
         )
 
-        char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
-
-        inventory_ids = [item["item_id"] for item in char["inventory"]]
-        # Should have a quest item with locket in the id
-        assert any("locket" in item_id for item_id in inventory_ids)
-
-    def test_inventory_add_no_duplicates(self, service, sample_character, sample_session):
-        """Duplicate items should not be added."""
-        dm_response = DMResponse(
-            narrative="Found!",
-            state_changes=StateChanges(inventory_add=["Sword"]),  # Already has Sword
-        )
-
         original_count = len(sample_character["inventory"])
         char, _ = service._apply_state_changes(sample_character, sample_session, dm_response)
 
+        # DM cannot grant ANY items - quest items must come from server systems
         assert len(char["inventory"]) == original_count
 
     def test_inventory_remove(self, service, sample_character, sample_session):

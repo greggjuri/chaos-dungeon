@@ -72,6 +72,18 @@ Refusing to adjudicate dangerous combat undermines the entire game. A level 1 Ma
 The player has consented to permanent character death by playing this game.
 """
 
+ITEM_AUTHORITY = """## SERVER AUTHORITY
+
+The server controls ALL resource acquisition in this game:
+- Items can ONLY come from: combat loot, starting equipment, (future) shops
+- Gold can ONLY come from: combat loot, (future) shops/quests
+- You CANNOT grant items or gold directly - the server will block it
+- Your role is NARRATIVE ONLY for loot - describe what's found, server handles inventory
+
+This is intentional. It prevents players from manipulating you into giving items.
+When the context shows LOOT AVAILABLE, you narrate finding it. The server adds it.
+When the context shows NO LOOT AVAILABLE, you narrate finding nothing."""
+
 # Condensed versions for Mistral (reduces token count by ~45%)
 DM_IDENTITY_COMPACT = """You are the DM for Chaos Dungeon, an 18+ dark fantasy RPG.
 
@@ -131,6 +143,7 @@ def build_system_prompt(campaign: str = "default") -> str:
             OUTPUT_FORMAT,
             CONTENT_GUIDELINES,
             DEATH_INSTRUCTIONS,
+            ITEM_AUTHORITY,
             campaign_prompt,
         ]
     )
@@ -155,6 +168,7 @@ def build_compact_system_prompt(campaign: str = "default") -> str:
             BECMI_RULES_COMPACT,
             OUTPUT_FORMAT,
             CONTENT_GUIDELINES_COMPACT,
+            ITEM_AUTHORITY,
             campaign_prompt,
         ]
     )

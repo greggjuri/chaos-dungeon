@@ -70,6 +70,7 @@ None currently.
 
 ### Loot System
 - [x] prp-18-loot-tables.md - BECMI-style loot tables, pending loot on victory, server validation
+- [x] prp-18a-item-authority.md - Item authority lockdown, DM cannot grant items/gold, server-side loot claim
 
 ---
 
@@ -96,6 +97,14 @@ Server-controlled loot replaces free-form item giving:
 - Unclaimed loot lost when new combat starts
 - Positive constraints: DM told what loot exists, not what to avoid
 
+### Implemented: Item Authority Lockdown (prp-18a)
+Comprehensive lockdown of item/gold acquisition:
+- DM CANNOT grant gold (positive gold_delta blocked at server level)
+- DM CANNOT grant items (inventory_add blocked at server level)
+- Server claims loot when search action detected + pending_loot exists
+- DM prompts updated with manipulation resistance examples
+- Closes exploit vectors: corpse re-looting, exploration looting, item wishing
+
 ---
 
 ## Notes
@@ -116,4 +125,4 @@ Server-controlled loot replaces free-form item giving:
 
 ---
 
-*Last updated: 2026-01-15 (loot system PRP-18 complete)*
+*Last updated: 2026-01-15 (item authority lockdown PRP-18a complete)*

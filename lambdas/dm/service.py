@@ -39,11 +39,12 @@ from dm.models import (
 )
 from dm.parser import parse_dm_response
 from dm.prompts import DMPromptBuilder
+from shared.actions import is_search_action
 from shared.cost_limits import CostLimits
 from shared.db import DynamoDBClient, convert_floats_to_decimal
 from shared.dice import roll as roll_dice_notation
 from shared.exceptions import GameStateError, NotFoundError
-from shared.items import ITEM_CATALOG, InventoryItem, find_item_by_name
+from shared.items import ITEM_CATALOG, InventoryItem
 from shared.loot import roll_combat_loot
 from shared.models import AbilityScores, Character, Item, Message, Session
 from shared.token_tracker import TokenTracker
@@ -638,6 +639,87 @@ class DMService:
             usage=None,
         )
 
+    def _claim_pending_loot(
+        self,
+        character: dict,
+        session: dict,
+    ) -> dict | None:
+        """Claim pending loot - SERVER CONTROLLED.
+
+        This is the ONLY authorized way for players to acquire items and gold
+        (outside of combat victory which sets pending_loot, and future: shops).
+
+        Args:
+            character: Character dict (will be modified in-place)
+            session: Session dict (will be modified in-place)
+
+        Returns:
+            Dict with {"gold": int, "items": list[str]} of what was claimed,
+            or None if no loot to claim
+        """
+        pending = session.get("pending_loot")
+        if not pending:
+            return None
+
+        gold = pending.get("gold", 0)
+        items = pending.get("items", [])
+
+        if not gold and not items:
+            session["pending_loot"] = None
+            return None
+
+        # Add gold directly to character
+        if gold > 0:
+            character["gold"] = character.get("gold", 0) + gold
+            logger.info(f"Claimed gold: {gold}")
+
+        # Add items directly to inventory
+        added_items = []
+        inventory = character.get("inventory", [])
+
+        for item_id in items:
+            item_def = ITEM_CATALOG.get(item_id)
+            if not item_def:
+                logger.warning(f"Unknown item in pending loot: {item_id}")
+                continue
+
+            # Check if item already in inventory
+            existing_idx = None
+            for i, inv_item in enumerate(inventory):
+                if isinstance(inv_item, dict) and inv_item.get("item_id") == item_id:
+                    existing_idx = i
+                    break
+
+            if existing_idx is not None:
+                # Increment quantity
+                current_qty = inventory[existing_idx].get("quantity", 1)
+                inventory[existing_idx]["quantity"] = current_qty + 1
+                logger.info(f"Incremented {item_def.name} quantity to {current_qty + 1}")
+            else:
+                # Add new item
+                inventory.append({
+                    "item_id": item_def.id,
+                    "name": item_def.name,
+                    "quantity": 1,
+                    "item_type": item_def.item_type.value,
+                    "description": item_def.description,
+                })
+                logger.info(f"Added item to inventory: {item_def.name}")
+
+            added_items.append(item_id)
+
+        character["inventory"] = inventory
+
+        # Clear pending loot
+        session["pending_loot"] = None
+
+        logger.info(
+            "Loot claimed (server-side)",
+            extra={"gold": gold, "items": added_items},
+        )
+
+        return {"gold": gold, "items": added_items}
+
     def _handle_use_item(
         self,
         character: dict,
@@ -946,6 +1028,7 @@ class DMService:
         """Process a normal (non-combat) action.
 
         Claude handles narrative and may initiate combat.
+        Server-side loot claiming happens here when search action detected.
 
         Args:
             session: Session dict from DynamoDB
@@ -957,6 +1040,19 @@ class DMService:
         Returns:
             ActionResponse with narrative and state changes
         """
+        # ============================================================
+        # SERVER-SIDE LOOT CLAIM
+        # If player is searching AND there's pending_loot, claim it
+        # BEFORE calling the DM. This ensures server controls acquisition.
+        # ============================================================
+        claimed_loot = None
+        if is_search_action(action) and session.get("pending_loot"):
+            claimed_loot = self._claim_pending_loot(character, session)
+            logger.info(
+                "Search action triggered loot claim",
+                extra={"claimed": claimed_loot},
+            )
+
         character_id = session["character_id"]
         campaign = session.get("campaign_setting", "default")
         system_prompt = self.prompt_builder.build_system_prompt(campaign)
@@ -1318,6 +1414,10 @@ class DMService:
     ) -> tuple[dict, dict]:
         """Apply state changes from DM response.
 
+        ITEM AUTHORITY: The DM cannot grant gold or items directly.
+        All resource acquisition is controlled by the server through
+        authorized channels (combat loot, shops, quests).
+
         Args:
             character: Character dict from DynamoDB
             session: Session dict from DynamoDB
@@ -1327,102 +1427,39 @@ class DMService:
             Updated (character, session) tuple
         """
         state = dm_response.state_changes
-        pending = session.get("pending_loot")
+
+        # ============================================================
+        # ABSOLUTE BLOCK: DM CANNOT GRANT GOLD OR ITEMS DIRECTLY
+        # All resource acquisition must go through server-controlled
+        # channels (combat loot claim, future: shops, quests)
+        # ============================================================
+        if state.gold_delta > 0:
+            logger.warning(
+                "BLOCKED: DM attempted unauthorized gold grant",
+                extra={"attempted": state.gold_delta},
+            )
+            state.gold_delta = 0  # Block positive gold grants
+
+        if state.inventory_add:
+            logger.warning(
+                "BLOCKED: DM attempted unauthorized item grant",
+                extra={"attempted": state.inventory_add},
+            )
+            state.inventory_add = []  # Block all item adds
 
         # Update character HP with bounds
         new_hp = character["hp"] + state.hp_delta
         character["hp"] = max(0, min(new_hp, character["max_hp"]))
 
-        # Validate and update gold
-        gold_delta = state.gold_delta
-        if pending and gold_delta > 0:
-            # Validate gold claim against pending loot
-            available_gold = pending.get("gold", 0)
-            if gold_delta > available_gold:
-                logger.warning(
-                    "DM tried to give more gold than pending",
-                    extra={"requested": gold_delta, "available": available_gold}
-                )
-                gold_delta = available_gold
-            # Reduce pending gold
-            pending["gold"] = available_gold - gold_delta
-
-        character["gold"] = max(0, character["gold"] + gold_delta)
+        # Gold spending (negative delta) is still allowed
+        if state.gold_delta < 0:
+            character["gold"] = max(0, character["gold"] + state.gold_delta)
 
         # Update XP
         character["xp"] = character["xp"] + state.xp_delta
 
-        # Inventory changes - validate items through catalog AND pending loot
+        # Inventory: only removals are processed (adds blocked above)
         inventory = character.get("inventory", [])
-        # Track item_ids to avoid duplicates
-        inventory_ids = [
-            item.get("item_id") for item in inventory if isinstance(item, dict)
-        ]
-
-        # Get pending items as a mutable list for validation
-        pending_items = list(pending.get("items", [])) if pending else []
-
-        for item_name in state.inventory_add:
-            # Validate item through catalog lookup
-            item_def = find_item_by_name(item_name)
-            if item_def is None:
-                logger.warning(
-                    f"DM tried to give unknown item: {item_name}",
-                    extra={"item_name": item_name},
-                )
-                continue  # Skip unknown items
-
-            # Validate against pending loot if present
-            if pending and pending_items:
-                if item_def.id in pending_items:
-                    # Valid claim - remove from pending
-                    pending_items.remove(item_def.id)
-                else:
-                    logger.warning(
-                        "DM tried to give item not in pending loot",
-                        extra={"item": item_name, "pending": pending_items}
-                    )
-                    continue  # Skip items not in pending loot
-
-            # Check if item already in inventory
-            existing_idx = None
-            for i, inv_item in enumerate(inventory):
-                if isinstance(inv_item, dict) and inv_item.get("item_id") == item_def.id:
-                    existing_idx = i
-                    break
-
-            if existing_idx is not None:
-                # Increment quantity of existing item
-                current_qty = inventory[existing_idx].get("quantity", 1)
-                inventory[existing_idx]["quantity"] = current_qty + 1
-                logger.info(
-                    f"Incremented {item_def.name} quantity to {current_qty + 1}",
-                    extra={"item_id": item_def.id},
-                )
-            else:
-                # Add new item
-                inventory.append({
-                    "item_id": item_def.id,
-                    "name": item_def.name,
-                    "quantity": 1,
-                    "item_type": item_def.item_type.value,
-                    "description": item_def.description,
-                })
-                inventory_ids.append(item_def.id)
-                logger.info(
-                    f"Added item to inventory: {item_def.name}",
-                    extra={"item_id": item_def.id, "item_type": item_def.item_type.value},
-                )
-
-        # Update pending items list
-        if pending:
-            pending["items"] = pending_items
-            # Clear pending_loot if empty
-            if pending.get("gold", 0) <= 0 and not pending.get("items"):
-                session["pending_loot"] = None
-                logger.info("All pending loot claimed")
-            else:
-                session["pending_loot"] = pending
 
         for item_name in state.inventory_remove:
             idx = self._find_inventory_item_index(inventory, item_name)
