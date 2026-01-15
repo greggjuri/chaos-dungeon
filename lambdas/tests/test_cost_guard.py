@@ -59,9 +59,10 @@ class TestCostGuard:
             "output_tokens": 500,
             "request_count": 5,
         }
+        # 80,000 is the session limit
         mock_tracker.get_session_usage.return_value = {
-            "input_tokens": 30000,
-            "output_tokens": 20000,
+            "input_tokens": 50000,
+            "output_tokens": 30000,
             "request_count": 100,
         }
 
@@ -112,7 +113,7 @@ class TestCostGuard:
 
         assert status.allowed is True
         assert status.global_remaining == 500_000 - 150_000  # 350K remaining
-        assert status.session_remaining == 50_000 - 15_000  # 35K remaining
+        assert status.session_remaining == 80_000 - 15_000  # 65K remaining (80K limit)
 
 
 class TestGetLimitMessage:

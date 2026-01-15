@@ -7,14 +7,23 @@ None currently.
 
 ### Up Next
 - [ ] init-17-player-agency.md - DM prompt fixes for player agency (stop moral railroading on dark actions)
-- [ ] init-19-shops.md - Gold-based item purchases from merchants
+
+---
+
+## Recently Completed
+
+### Commerce System (prp-18c)
+- [x] Server-side buy/sell transactions via commerce_sell and commerce_buy fields
+- [x] DM prompts with commerce instructions and context injection
+- [x] Sell at 50% value (minimum 1 gold)
+- [x] Buy validates gold and item existence
 
 ---
 
 ## Backlog
 
 ### Phase 3 - Game Systems (Prioritized)
-- [ ] init-19-shops.md - Gold-based item purchases from merchants
+- [x] init-19-shops.md - Gold-based item purchases from merchants (implemented as prp-18c-commerce)
 - [ ] init-11-dice-rolling.md - Dice mechanics with UI display
 - [ ] init-12-leveling.md - XP and level progression
 
@@ -126,4 +135,4 @@ Comprehensive lockdown of item/gold acquisition:
 
 ---
 
-*Last updated: 2026-01-15 (loot debug PRP-18b complete)*
+*Last updated: 2026-01-15 (commerce system PRP-18c complete)*

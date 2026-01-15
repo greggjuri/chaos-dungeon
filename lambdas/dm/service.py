@@ -44,7 +44,7 @@ from shared.cost_limits import CostLimits
 from shared.db import DynamoDBClient, convert_floats_to_decimal
 from shared.dice import roll as roll_dice_notation
 from shared.exceptions import GameStateError, NotFoundError
-from shared.items import ITEM_CATALOG, InventoryItem
+from shared.items import ITEM_ALIASES, ITEM_CATALOG, InventoryItem
 from shared.loot import roll_combat_loot
 from shared.models import AbilityScores, Character, Item, Message, Session
 from shared.token_tracker import TokenTracker
@@ -737,6 +737,148 @@ class DMService:
 
         return {"gold": gold, "items": added_items}
 
+    def _process_commerce(
+        self,
+        character: dict,
+        state: StateChanges,
+    ) -> dict:
+        """Process buy/sell transactions server-side.
+
+        Both sides of the transaction are atomic - if validation fails,
+        nothing changes.
+
+        Args:
+            character: Character dict (will be modified in-place)
+            state: StateChanges from DM response
+
+        Returns:
+            Result dict with sold/bought info or error
+        """
+        result: dict = {"sold": None, "bought": None, "error": None}
+
+        # Handle sell
+        if state.commerce_sell:
+            item_id = self._normalize_item_id(state.commerce_sell)
+            inventory = character.get("inventory", [])
+
+            # Find item in inventory
+            item_index = self._find_inventory_item_index(inventory, item_id)
+
+            if item_index is None:
+                logger.warning(
+                    "COMMERCE: Sell failed - item not in inventory",
+                    extra={"item": item_id},
+                )
+                result["error"] = f"Cannot sell {item_id} - not in inventory"
+            else:
+                item_def = ITEM_CATALOG.get(item_id)
+                # 50% value, minimum 1 gold
+                sell_price = max(1, (item_def.value // 2) if item_def else 1)
+
+                # Atomic: remove item AND add gold
+                item = inventory[item_index]
+                if isinstance(item, dict):
+                    qty = item.get("quantity", 1)
+                    if qty > 1:
+                        inventory[item_index]["quantity"] = qty - 1
+                    else:
+                        inventory.pop(item_index)
+                else:
+                    inventory.pop(item_index)
+
+                character["gold"] = character.get("gold", 0) + sell_price
+                character["inventory"] = inventory
+
+                result["sold"] = {"item": item_id, "gold": sell_price}
+                logger.info("COMMERCE: Item sold", extra=result["sold"])
+
+        # Handle buy
+        if state.commerce_buy:
+            buy_data = state.commerce_buy
+            item_id = self._normalize_item_id(buy_data.item)
+            price = buy_data.price
+
+            current_gold = character.get("gold", 0)
+            item_def = ITEM_CATALOG.get(item_id)
+
+            if not item_def:
+                logger.warning(
+                    "COMMERCE: Buy failed - unknown item",
+                    extra={"item": item_id},
+                )
+                result["error"] = f"Unknown item: {item_id}"
+            elif price > current_gold:
+                logger.warning(
+                    "COMMERCE: Buy failed - insufficient gold",
+                    extra={"price": price, "gold": current_gold},
+                )
+                result["error"] = f"Cannot afford {item_id} - costs {price}, have {current_gold}"
+            else:
+                # Atomic: deduct gold AND add item
+                character["gold"] = current_gold - price
+                self._add_item_to_inventory(character, item_def)
+
+                result["bought"] = {"item": item_id, "gold": price}
+                logger.info("COMMERCE: Item bought", extra=result["bought"])
+
+        return result
+
+    def _normalize_item_id(self, item_name: str) -> str:
+        """Normalize item name to catalog ID format.
+
+        Args:
+            item_name: Item name from DM output (may have spaces, mixed case)
+
+        Returns:
+            Normalized item ID (lowercase, underscores)
+        """
+        normalized = item_name.lower().strip()
+
+        # Try direct catalog lookup first
+        if normalized in ITEM_CATALOG:
+            return normalized
+
+        # Try underscore conversion (e.g., "healing potion" -> "healing_potion")
+        underscore_id = normalized.replace(" ", "_")
+        if underscore_id in ITEM_CATALOG:
+            return underscore_id
+
+        # Check aliases
+        if normalized in ITEM_ALIASES:
+            return ITEM_ALIASES[normalized]
+
+        return underscore_id
+
+    def _add_item_to_inventory(self, character: dict, item_def) -> None:
+        """Add item to character inventory, handling quantity stacking.
+
+        Args:
+            character: Character dict (modified in-place)
+            item_def: Item definition to add
+        """
+        inventory = character.get("inventory", [])
+
+        # Check if item already in inventory
+        for i, inv_item in enumerate(inventory):
+            if isinstance(inv_item, dict) and inv_item.get("item_id") == item_def.id:
+                # Increment quantity
+                current_qty = inv_item.get("quantity", 1)
+                inventory[i]["quantity"] = current_qty + 1
+                logger.info(f"COMMERCE: Incremented {item_def.name} to {current_qty + 1}")
+                character["inventory"] = inventory
+                return
+
+        # Add new item
+        inventory.append({
+            "item_id": item_def.id,
+            "name": item_def.name,
+            "quantity": 1,
+            "item_type": item_def.item_type.value,
+            "description": item_def.description,
+        })
+        logger.info(f"COMMERCE: Added new item {item_def.name}")
+        character["inventory"] = inventory
+
     def _handle_use_item(
         self,
         character: dict,
@@ -1111,7 +1253,7 @@ class DMService:
             message_history=[Message(**m) for m in session.get("message_history", [])],
         )
 
-        context = self.prompt_builder.build_context(char_model, sess_model, session)
+        context = self.prompt_builder.build_context(char_model, sess_model, session, action)
 
         # Call Claude
         client = self._get_ai_client()
@@ -1441,7 +1583,7 @@ class DMService:
 
         ITEM AUTHORITY: The DM cannot grant gold or items directly.
         All resource acquisition is controlled by the server through
-        authorized channels (combat loot, shops, quests).
+        authorized channels (combat loot, shops/commerce, quests).
 
         Args:
             character: Character dict from DynamoDB
@@ -1454,9 +1596,17 @@ class DMService:
         state = dm_response.state_changes
 
         # ============================================================
+        # COMMERCE: Process buy/sell transactions FIRST (before blocks)
+        # These are server-validated atomic transactions
+        # ============================================================
+        commerce_result = self._process_commerce(character, state)
+        if commerce_result.get("error"):
+            logger.warning("Commerce error", extra={"error": commerce_result["error"]})
+
+        # ============================================================
         # ABSOLUTE BLOCK: DM CANNOT GRANT GOLD OR ITEMS DIRECTLY
         # All resource acquisition must go through server-controlled
-        # channels (combat loot claim, future: shops, quests)
+        # channels (combat loot claim, commerce, quests)
         # ============================================================
         if state.gold_delta > 0:
             logger.warning(

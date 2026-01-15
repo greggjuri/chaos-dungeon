@@ -33,6 +33,7 @@ class DMPromptBuilder:
         character: Character,
         session: Session,
         session_data: dict | None = None,
+        action: str = "",
     ) -> str:
         """Build the dynamic context section (~500-800 tokens).
 
@@ -41,11 +42,13 @@ class DMPromptBuilder:
         - Current location and world state
         - Recent message history (last 10 messages)
         - Pending loot info (if any)
+        - Commerce context (if buy/sell action detected)
 
         Args:
             character: Current player character
             session: Current game session
             session_data: Optional raw session dict for pending_loot access
+            action: Player action text for commerce detection
 
         Returns:
             Context string to append after system prompt
@@ -61,6 +64,12 @@ class DMPromptBuilder:
             loot_context = self._format_pending_loot(session_data)
             if loot_context:
                 parts.append(loot_context)
+
+        # Add commerce context if commerce action detected
+        if action:
+            commerce_context = self._format_commerce_context(character, action)
+            if commerce_context:
+                parts.append(commerce_context)
 
         return "\n\n".join(parts)
 
@@ -230,3 +239,54 @@ World State: {flags}"""
 There is no loot available in this area.
 If the player searches, narrate them finding nothing of value.
 Do NOT invent items or gold - the server controls all acquisition."""
+
+    def _format_commerce_context(self, character: Character, action: str) -> str | None:
+        """Format commerce context when buy/sell action detected.
+
+        Args:
+            character: Player character
+            action: Player action text
+
+        Returns:
+            Commerce context block or None if not a commerce action
+        """
+        from shared.actions import is_buy_action, is_sell_action
+
+        is_sell = is_sell_action(action)
+        is_buy = is_buy_action(action)
+
+        if not is_sell and not is_buy:
+            return None
+
+        gold = character.gold
+
+        lines = ["## COMMERCE CONTEXT"]
+        lines.append(f"Player has {gold} gold.")
+
+        if is_sell and character.inventory:
+            lines.append("")
+            lines.append("SELLABLE ITEMS (50% value, minimum 1 gold):")
+            for item in character.inventory:
+                item_id = getattr(item, "item_id", None) or item.name.lower().replace(" ", "_")
+                item_def = ITEM_CATALOG.get(item_id)
+                if item_def:
+                    sell_price = max(1, item_def.value // 2)
+                    lines.append(f"- {item_def.name} ({item_def.id}): {sell_price} gold")
+                else:
+                    lines.append(f"- {item.name}: 1 gold (unknown item)")
+
+        if is_buy:
+            lines.append("")
+            lines.append(f"Player can afford items up to {gold} gold.")
+            lines.append("")
+            lines.append("COMMON SHOP PRICES:")
+            lines.append("- torch: 1 gold")
+            lines.append("- dagger: 3 gold")
+            lines.append("- rations: 5 gold")
+            lines.append("- sword: 10 gold")
+            lines.append("- shield: 10 gold")
+            lines.append("- leather_armor: 10 gold")
+            lines.append("- chain_mail: 40 gold")
+            lines.append("- potion_healing: 50 gold")
+
+        return "\n".join(lines)

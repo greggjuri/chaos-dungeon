@@ -49,6 +49,16 @@ class CombatLogEntry(BaseModel):
     narrative: str = ""  # AI-generated description
 
 
+class CommerceTransaction(BaseModel):
+    """Buy transaction details from DM."""
+
+    item: str
+    """Item ID to purchase."""
+
+    price: int = Field(ge=0)
+    """Gold cost (should match catalog price)."""
+
+
 class StateChanges(BaseModel):
     """State changes to apply to game state after DM response.
 
@@ -79,6 +89,12 @@ class StateChanges(BaseModel):
 
     item_used: str | None = None
     """Item that was consumed this turn."""
+
+    commerce_sell: str | None = None
+    """Item ID to sell. Server removes from inventory, adds 50% value as gold."""
+
+    commerce_buy: CommerceTransaction | None = None
+    """Purchase request. Server validates gold, deducts, adds item."""
 
 
 class DiceRoll(BaseModel):
