@@ -237,7 +237,17 @@ def roll_enemy_loot(enemy_type: str) -> dict:
     # Normalize enemy type for lookup
     normalized = enemy_type.lower().strip().replace(" ", "_")
 
-    table = LOOT_TABLES.get(normalized, LOOT_TABLES["unknown_enemy"])
+    has_table = normalized in LOOT_TABLES
+    table_key = normalized if has_table else "unknown_enemy"
+
+    logger.info("LOOT_FLOW: Enemy table lookup", extra={
+        "original": enemy_type,
+        "normalized": normalized,
+        "has_table": has_table,
+        "table_used": table_key,
+    })
+
+    table = LOOT_TABLES[table_key]
 
     # Roll gold
     gold = 0
@@ -255,14 +265,11 @@ def roll_enemy_loot(enemy_type: str) -> dict:
         if item:
             items.append(item)
 
-    logger.debug(
-        "Rolled enemy loot",
-        extra={
-            "enemy_type": normalized,
-            "gold": gold,
-            "items": items,
-        }
-    )
+    logger.info("LOOT_FLOW: Rolled enemy loot", extra={
+        "enemy_type": table_key,
+        "gold": gold,
+        "items": items,
+    })
 
     return {"gold": gold, "items": items}
 
@@ -279,23 +286,49 @@ def roll_combat_loot(defeated_enemies: list[dict]) -> dict:
     total_gold = 0
     all_items = []
 
+    logger.info("LOOT_FLOW: Rolling combat loot", extra={
+        "enemy_count": len(defeated_enemies),
+        "enemies": [e.get("name", "unknown") for e in defeated_enemies],
+    })
+
     for enemy in defeated_enemies:
         enemy_name = enemy.get("name", "unknown")
-        # Strip numbering (e.g., "Goblin 1" -> "goblin")
-        base_name = enemy_name.split()[0] if enemy_name else "unknown"
 
-        loot = roll_enemy_loot(base_name)
+        # Strip numbering from end (e.g., "Goblin 1" -> "Goblin")
+        # Keep multi-word names intact (e.g., "Drunken Man" stays "Drunken Man")
+        parts = enemy_name.split()
+        if parts and parts[-1].isdigit():
+            parts = parts[:-1]
+        clean_name = " ".join(parts) if parts else "unknown"
+
+        # Try full name with underscores first (e.g., "drunken_man")
+        full_normalized = clean_name.lower().replace(" ", "_")
+        first_word = parts[0].lower() if parts else "unknown"
+
+        if full_normalized in LOOT_TABLES:
+            table_key = full_normalized
+        elif first_word in LOOT_TABLES:
+            table_key = first_word
+        else:
+            table_key = "unknown_enemy"
+
+        logger.info("LOOT_FLOW: Enemy table resolution", extra={
+            "enemy_name": enemy_name,
+            "clean_name": clean_name,
+            "tried_full": full_normalized,
+            "tried_first": first_word,
+            "resolved_to": table_key,
+        })
+
+        loot = roll_enemy_loot(table_key)
         total_gold += loot["gold"]
         all_items.extend(loot["items"])
 
-    logger.info(
-        "Rolled combat loot",
-        extra={
-            "enemy_count": len(defeated_enemies),
-            "total_gold": total_gold,
-            "items": all_items,
-        }
-    )
+    logger.info("LOOT_FLOW: Combat loot complete", extra={
+        "enemy_count": len(defeated_enemies),
+        "total_gold": total_gold,
+        "items": all_items,
+    })
 
     return {
         "gold": total_gold,

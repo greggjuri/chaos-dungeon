@@ -36,9 +36,13 @@ def is_search_action(action: str) -> bool:
     action_lower = action.lower()
     for pattern in SEARCH_PATTERNS:
         if re.search(pattern, action_lower):
-            logger.debug(
-                "Search action detected",
-                extra={"action": action, "matched_pattern": pattern},
-            )
+            logger.info("LOOT_FLOW: Search action detected", extra={
+                "action": action[:100],
+                "matched_pattern": pattern,
+            })
             return True
+
+    logger.debug("LOOT_FLOW: Not a search action", extra={
+        "action": action[:100],
+    })
     return False

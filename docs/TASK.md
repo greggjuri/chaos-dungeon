@@ -71,6 +71,7 @@ None currently.
 ### Loot System
 - [x] prp-18-loot-tables.md - BECMI-style loot tables, pending loot on victory, server validation
 - [x] prp-18a-item-authority.md - Item authority lockdown, DM cannot grant items/gold, server-side loot claim
+- [x] prp-18b-loot-debug.md - LOOT_FLOW diagnostic logging, multi-word enemy name fix
 
 ---
 
@@ -125,4 +126,4 @@ Comprehensive lockdown of item/gold acquisition:
 
 ---
 
-*Last updated: 2026-01-15 (item authority lockdown PRP-18a complete)*
+*Last updated: 2026-01-15 (loot debug PRP-18b complete)*

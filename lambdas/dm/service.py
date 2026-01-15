@@ -556,13 +556,20 @@ class DMService:
         # Roll loot on victory
         if victory:
             combat_enemies_data = session.get("combat_enemies", [])
+            logger.info("LOOT_FLOW: Combat victory", extra={
+                "enemy_count": len(combat_enemies_data),
+                "enemies": [e.get("name") for e in combat_enemies_data],
+            })
+
             pending_loot = roll_combat_loot(combat_enemies_data)
+
             if pending_loot["gold"] > 0 or pending_loot["items"]:
                 session["pending_loot"] = pending_loot
-                logger.info(
-                    "Pending loot set",
-                    extra={"loot": pending_loot}
-                )
+                logger.info("LOOT_FLOW: Pending loot stored", extra={
+                    "pending": pending_loot,
+                })
+            else:
+                logger.info("LOOT_FLOW: No loot rolled (empty result)")
 
         # Apply XP
         character["xp"] += xp_gained
@@ -658,7 +665,15 @@ class DMService:
             or None if no loot to claim
         """
         pending = session.get("pending_loot")
+
+        logger.info("LOOT_FLOW: Claim attempt", extra={
+            "pending": pending,
+            "character_gold_before": character.get("gold", 0),
+            "inventory_count_before": len(character.get("inventory", [])),
+        })
+
         if not pending:
+            logger.info("LOOT_FLOW: No pending loot to claim")
             return None
 
         gold = pending.get("gold", 0)
@@ -666,12 +681,12 @@ class DMService:
 
         if not gold and not items:
             session["pending_loot"] = None
+            logger.info("LOOT_FLOW: Pending loot was empty")
             return None
 
         # Add gold directly to character
         if gold > 0:
             character["gold"] = character.get("gold", 0) + gold
-            logger.info(f"Claimed gold: {gold}")
 
         # Add items directly to inventory
         added_items = []
@@ -713,10 +728,12 @@ class DMService:
         # Clear pending loot
         session["pending_loot"] = None
 
-        logger.info(
-            "Loot claimed (server-side)",
-            extra={"gold": gold, "items": added_items},
-        )
+        logger.info("LOOT_FLOW: Claim complete", extra={
+            "gold_added": gold,
+            "items_added": added_items,
+            "character_gold_after": character.get("gold", 0),
+            "inventory_count_after": len(character.get("inventory", [])),
+        })
 
         return {"gold": gold, "items": added_items}
 
@@ -1045,13 +1062,21 @@ class DMService:
         # If player is searching AND there's pending_loot, claim it
         # BEFORE calling the DM. This ensures server controls acquisition.
         # ============================================================
+        is_search = is_search_action(action)
+        has_pending = bool(session.get("pending_loot"))
+
+        logger.info("LOOT_FLOW: Search check", extra={
+            "action": action[:100],
+            "is_search": is_search,
+            "has_pending_loot": has_pending,
+            "pending_loot": session.get("pending_loot"),
+        })
+
         claimed_loot = None
-        if is_search_action(action) and session.get("pending_loot"):
+        if is_search and has_pending:
+            logger.info("LOOT_FLOW: Triggering claim")
             claimed_loot = self._claim_pending_loot(character, session)
-            logger.info(
-                "Search action triggered loot claim",
-                extra={"claimed": claimed_loot},
-            )
+            logger.info("LOOT_FLOW: Claim result", extra={"claimed": claimed_loot})
 
         character_id = session["character_id"]
         campaign = session.get("campaign_setting", "default")
