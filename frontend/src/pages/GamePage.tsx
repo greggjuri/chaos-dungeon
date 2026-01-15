@@ -153,7 +153,7 @@ export function GamePage() {
   const inventoryItems = getInventoryItems();
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900 overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-178px)] bg-gray-900 overflow-hidden">
       {/* Fixed header section - never scrolls */}
       <header className="flex-shrink-0 bg-gray-900 z-10">
         {/* Character status bar */}
