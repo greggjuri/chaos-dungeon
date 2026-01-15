@@ -1,54 +1,100 @@
 # Chaos Dungeon - Task Tracker
 
-## Current Sprint: Polish & Cost Control
+## Current Sprint: Inventory System Polish
 
 ### In Progress
-- [ ] prp-12-turn-based-combat.md - Integration testing in browser (deployed, needs manual verification)
-- [x] prp-14-combat-polish.md - Combat narrator cleanup, enemy numbering, target parsing
+None currently.
 
-### To Do (Phase 2 - Core Game Loop)
-- [x] init-06-action-handler.md - Process player actions
-- [x] init-08-game-ui.md - Chat interface with message history
-- [ ] init-08-state-parsing.md - Parse DM responses for state changes
+### Up Next
+- [ ] init-17-player-agency.md - DM prompt fixes for player agency (stop moral railroading on dark actions)
+- [ ] init-18-loot-tables.md - Server-controlled loot system with BECMI-style loot tables
 
-### To Do (Phase 3 - Game Systems)
-- [x] init-07-combat-system.md - Server-side combat resolution
-- [ ] init-10-inventory.md - Item management
-- [ ] init-11-dice-rolling.md - Dice mechanics with UI
+---
+
+## Backlog
+
+### Phase 3 - Game Systems (Prioritized)
+- [ ] init-18-loot-tables.md - Loot tables, pre-rolled loot on combat victory, named NPC/location registry
+- [ ] init-19-shops.md - Gold-based item purchases from merchants
+- [ ] init-11-dice-rolling.md - Dice mechanics with UI display
 - [ ] init-12-leveling.md - XP and level progression
 
-### To Do (Phase 4 - Polish)
+### Phase 4 - Polish
 - [ ] init-13-save-slots.md - Multiple characters/campaigns
 - [ ] init-14-session-resume.md - Continue saved games
 - [ ] init-15-character-sheet.md - Detailed character view
 
-### Completed
-- [x] Initial project planning (PLANNING.md)
-- [x] Claude Code instructions (CLAUDE.md)
+### Phase 5 - Advanced Features
+- [ ] Spell system for Magic-Users and Clerics
+- [ ] Dungeon generation / procedural content
+- [ ] Boss encounters with special mechanics
+
+---
+
+## Completed
+
+### Infrastructure & Foundation
 - [x] init-01-project-foundation.md - CDK base stack, DynamoDB, Lambda structure, Frontend shell
 - [x] init-02-character-api.md - Character CRUD endpoints with BECMI rules
 - [x] init-03-session-api.md - Session CRUD with campaign settings and message history
 - [x] init-04-frontend-shell.md - React app with routing, pages, API services, user context, age gate
+- [x] prp-11-domain-setup.md - S3/CloudFront/Route53 hosting at chaos.jurigregg.com
+
+### DM & AI System
 - [x] init-05-dm-system-prompt.md - DM prompt engineering with BECMI rules, campaign prompts, response parser
 - [x] init-06-action-handler.md - DM Lambda with Claude API, action processing, state changes
-- [x] init-07-combat-system.md - Server-side combat resolution with dice, bestiary, combat resolver
-- [x] init-08-game-ui.md - Chat interface with message history, character status, combat display
 - [x] prp-09-mistral-dm.md - Migrate DM from Claude Haiku to Mistral Small via AWS Bedrock
-- [x] prp-10-cost-protection.md - Application-level cost protection with token limits
+
+### Combat System
+- [x] init-07-combat-system.md - Server-side combat resolution with dice, bestiary, combat resolver
+- [x] prp-12-turn-based-combat.md - Turn-based combat with targeting, flee mechanics
+- [x] prp-14-combat-polish.md - Combat narrator cleanup, enemy numbering, positive constraints
+
+### UI & Game Interface
+- [x] init-08-game-ui.md - Chat interface with message history, character status, combat display
 - [x] Token counter UI - Debug overlay showing session/global token usage (press T to toggle)
-- [x] Increase MAX_SESSIONS_PER_USER to 15
-- [x] prp-11-domain-setup.md - S3/CloudFront/Route53 hosting infrastructure
+
+### Cost Control
+- [x] prp-10-cost-protection.md - Application-level cost protection with token limits
+
+### Inventory System
+- [x] prp-15-inventory-system.md - Server-side inventory, starting equipment, item catalog, USE_ITEM combat action
+- [x] prp-16-inventory-fixes.md - Case-insensitive removal, quantity handling
+- [x] prp-16a-frontend-inventory-sync.md - Frontend inventory sync from action responses
+- [x] prp-16b-inventory-ui-polish.md - Inline quantities, item increment on add
+- [x] prp-16c-final-inventory-fixes.md - Auto-focus, quote stripping, expanded keywords
+- [x] prp-16d-layout-and-tools.md - Status bar semantic markup, tool keywords
+- [x] prp-16e-layout-hotfix.md - Resizable inventory panel, overflow-hidden restore
+- [x] prp-16f-scroll-containment.md - Scroll containment wrapper with flex-1 min-h-0
+- [x] prp-16g-chathistory-scroll-fix.md - Move scroll to wrapper, ChatHistory fills with h-full
+- [x] prp-16h-document-scroll-fix.md - Prevent document-level scrolling with useEffect
+
+---
+
+## Architecture Decisions
+
+### Key Learnings from Inventory System (init-15/16)
+1. **Positive constraints > negative constraints** - Tell DM what items exist, not what to avoid
+2. **Server authority = game integrity** - Dice, combat, inventory all controlled server-side
+3. **Manual integration testing is essential** - Unit tests miss frontend-backend integration bugs
+4. **Check where functions are called** - Bugs often in invocation, not implementation
+
+### Key Learnings from Layout Fixes (prp-16d-16h)
+1. **Flexbox scroll containment requires min-h-0** - Without it, flex items grow to content size
+2. **Single scroll container per region** - Don't have nested elements both trying to scroll
+3. **Document can scroll independently** - Must set overflow:hidden on html/body to prevent
+4. **DevTools is essential** - getBoundingClientRect() and scrollTop reveal true state
+
+### Planned: Loot Table System (init-18+)
+Instead of DM freely giving items:
+- Pre-roll loot when combat ends / rooms entered
+- Named NPCs/locations have fixed or table-rolled inventories
+- Player must "search" to claim pre-rolled loot
+- Prevents item wishing, maintains game balance
 
 ---
 
 ## Notes
-
-### Blockers
-None currently.
-
-### Questions to Resolve
-1. ~~Anonymous sessions vs Cognito auth for MVP?~~ - Resolved: Anonymous sessions per ADR-005
-2. Preset starting scenarios vs fully procedural?
 
 ### Configuration
 - MAX_SESSIONS_PER_USER: 15
@@ -57,10 +103,14 @@ None currently.
 - SESSION_DAILY_TOKENS: 50,000
 
 ### Cost Tracking
-- Current estimated monthly: $0 (not deployed)
+- Current estimated monthly: ~$5-10 (Mistral Small + AWS)
 - Target: < $20/month
 - Protection: Real-time token limits (ADR-010)
 
+### Known Issues
+- DM sometimes overrides player agency on dark/violent actions (init-17 will fix)
+- Need proper loot system to prevent item wishing (init-18 will fix)
+
 ---
 
-*Last updated: 2026-01-11 (prp-14 combat polish implementation)*
+*Last updated: 2026-01-15 (layout fixes PRPs 16d-16h complete)*
