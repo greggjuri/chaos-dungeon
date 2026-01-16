@@ -47,7 +47,8 @@ export function CharacterSheet({ character, snapshot }: CharacterSheetProps) {
   const xp = snapshot?.xp ?? character.xp;
   const gold = snapshot?.gold ?? character.gold;
   const level = snapshot?.level ?? character.level;
-  const abilities = character.abilities;
+  // Backend uses 'stats' field for ability scores (fall back to 'abilities' for legacy)
+  const stats = character.stats ?? character.abilities;
 
   const hpPercentage = Math.max(0, Math.min(100, (hp / maxHp) * 100));
   const hpColor = getHpColor(hp, maxHp);
@@ -108,13 +109,13 @@ export function CharacterSheet({ character, snapshot }: CharacterSheetProps) {
         </h3>
         <div className="grid grid-cols-3 gap-2">
           {/* Row 1: STR, INT, WIS */}
-          <AbilityScore label="STR" value={abilities.strength} />
-          <AbilityScore label="INT" value={abilities.intelligence} />
-          <AbilityScore label="WIS" value={abilities.wisdom} />
+          <AbilityScore label="STR" value={stats?.strength ?? 0} />
+          <AbilityScore label="INT" value={stats?.intelligence ?? 0} />
+          <AbilityScore label="WIS" value={stats?.wisdom ?? 0} />
           {/* Row 2: DEX, CON, CHA */}
-          <AbilityScore label="DEX" value={abilities.dexterity} />
-          <AbilityScore label="CON" value={abilities.constitution} />
-          <AbilityScore label="CHA" value={abilities.charisma} />
+          <AbilityScore label="DEX" value={stats?.dexterity ?? 0} />
+          <AbilityScore label="CON" value={stats?.constitution ?? 0} />
+          <AbilityScore label="CHA" value={stats?.charisma ?? 0} />
         </div>
       </div>
     </div>

@@ -47,7 +47,8 @@ export interface Character {
   hp: number;
   max_hp: number;
   gold: number;
-  abilities: AbilityScores;
+  stats: AbilityScores;  // Backend uses 'stats' field for ability scores
+  abilities?: AbilityScores;  // Legacy field, prefer stats
   inventory: Item[];
   created_at: string;
   updated_at?: string;

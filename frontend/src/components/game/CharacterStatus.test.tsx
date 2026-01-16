@@ -17,7 +17,7 @@ describe('CharacterStatus', () => {
     hp: 20,
     max_hp: 25,
     gold: 150,
-    abilities: {
+    stats: {
       strength: 16,
       intelligence: 10,
       wisdom: 12,
