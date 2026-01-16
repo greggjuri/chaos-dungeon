@@ -15,7 +15,6 @@ from shared.items import get_starting_equipment
 from shared.utils import (
     calculate_modifier,
     generate_id,
-    roll_ability_scores,
     utc_now,
 )
 
@@ -46,8 +45,8 @@ class CharacterService:
         character_id = generate_id()
         now = utc_now()
 
-        # Roll ability scores (3d6 for each)
-        stats = roll_ability_scores()
+        # Use ability scores from request (rolled by frontend)
+        stats = request.abilities.model_dump()
         con_modifier = calculate_modifier(stats["constitution"])
 
         # Get class-specific values

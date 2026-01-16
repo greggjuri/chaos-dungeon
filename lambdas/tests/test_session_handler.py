@@ -58,7 +58,18 @@ def create_character(user_id: str = "test-user-123") -> str:
         "headers": {"Content-Type": "application/json", "X-User-Id": user_id},
         "pathParameters": {},
         "queryStringParameters": None,
-        "body": json.dumps({"name": "TestHero", "character_class": "fighter"}),
+        "body": json.dumps({
+            "name": "TestHero",
+            "character_class": "fighter",
+            "abilities": {
+                "strength": 14,
+                "intelligence": 10,
+                "wisdom": 12,
+                "dexterity": 13,
+                "constitution": 15,
+                "charisma": 11,
+            },
+        }),
         "requestContext": {"stage": "dev", "requestId": "test"},
         "resource": "/characters",
     }

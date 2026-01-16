@@ -5,12 +5,15 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
+from shared.models import AbilityScores
+
 
 class CharacterCreateRequest(BaseModel):
     """Request body for creating a new character."""
 
     name: str = Field(..., min_length=3, max_length=30)
     character_class: str = Field(..., pattern="^(fighter|thief|magic_user|cleric)$")
+    abilities: AbilityScores
 
     @field_validator("name")
     @classmethod

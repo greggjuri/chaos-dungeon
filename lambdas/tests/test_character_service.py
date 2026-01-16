@@ -7,6 +7,18 @@ import pytest
 from character.models import CharacterCreateRequest, CharacterUpdateRequest
 from character.service import CharacterService
 from shared.exceptions import NotFoundError
+from shared.models import AbilityScores
+
+
+# Standard test abilities for character creation
+TEST_ABILITIES = AbilityScores(
+    strength=14,
+    intelligence=10,
+    wisdom=12,
+    dexterity=13,
+    constitution=15,
+    charisma=11,
+)
 
 
 @pytest.fixture
@@ -26,22 +38,15 @@ class TestCreateCharacter:
 
     def test_create_character_returns_character_data(self, service, mock_db):
         """Create character should return full character data."""
-        request = CharacterCreateRequest(name="Thorin", character_class="fighter")
+        request = CharacterCreateRequest(
+            name="Thorin", character_class="fighter", abilities=TEST_ABILITIES
+        )
 
         with patch("character.service.generate_id", return_value="char-123"):
             with patch("character.service.utc_now", return_value="2026-01-01T00:00:00Z"):
-                with patch("character.service.roll_ability_scores") as mock_roll:
-                    mock_roll.return_value = {
-                        "strength": 14,
-                        "intelligence": 10,
-                        "wisdom": 12,
-                        "dexterity": 13,
-                        "constitution": 15,
-                        "charisma": 11,
-                    }
-                    with patch("character.service.roll_starting_hp", return_value=7):
-                        with patch("character.service.roll_starting_gold", return_value=120):
-                            result = service.create_character("user-123", request)
+                with patch("character.service.roll_starting_hp", return_value=7):
+                    with patch("character.service.roll_starting_gold", return_value=120):
+                        result = service.create_character("user-123", request)
 
         assert result["character_id"] == "char-123"
         assert result["name"] == "Thorin"
@@ -60,7 +65,9 @@ class TestCreateCharacter:
 
     def test_create_character_calls_db_put(self, service, mock_db):
         """Create character should call db.put_item."""
-        request = CharacterCreateRequest(name="Gandalf", character_class="magic_user")
+        request = CharacterCreateRequest(
+            name="Gandalf", character_class="magic_user", abilities=TEST_ABILITIES
+        )
 
         with patch("character.service.generate_id", return_value="char-456"):
             with patch("character.service.utc_now", return_value="2026-01-01T00:00:00Z"):
@@ -73,7 +80,9 @@ class TestCreateCharacter:
 
     def test_create_character_stats_are_valid(self, service, mock_db):
         """Created character stats should be in valid range."""
-        request = CharacterCreateRequest(name="Test", character_class="cleric")
+        request = CharacterCreateRequest(
+            name="Test", character_class="cleric", abilities=TEST_ABILITIES
+        )
 
         result = service.create_character("user-123", request)
 
@@ -82,7 +91,9 @@ class TestCreateCharacter:
 
     def test_create_character_hp_is_positive(self, service, mock_db):
         """Created character HP should be at least 1."""
-        request = CharacterCreateRequest(name="Test", character_class="thief")
+        request = CharacterCreateRequest(
+            name="Test", character_class="thief", abilities=TEST_ABILITIES
+        )
 
         result = service.create_character("user-123", request)
 
@@ -92,7 +103,9 @@ class TestCreateCharacter:
 
     def test_create_character_gold_is_valid(self, service, mock_db):
         """Created character gold should be 30-180."""
-        request = CharacterCreateRequest(name="Test", character_class="fighter")
+        request = CharacterCreateRequest(
+            name="Test", character_class="fighter", abilities=TEST_ABILITIES
+        )
 
         result = service.create_character("user-123", request)
 
@@ -101,7 +114,9 @@ class TestCreateCharacter:
 
     def test_create_fighter_has_starting_equipment(self, service, mock_db):
         """Fighter gets sword, shield, chain mail."""
-        request = CharacterCreateRequest(name="Warrior", character_class="fighter")
+        request = CharacterCreateRequest(
+            name="Warrior", character_class="fighter", abilities=TEST_ABILITIES
+        )
         result = service.create_character("user-123", request)
 
         item_ids = [item["item_id"] for item in result["inventory"]]
@@ -112,7 +127,9 @@ class TestCreateCharacter:
 
     def test_create_thief_has_starting_equipment(self, service, mock_db):
         """Thief gets dagger, leather armor, thieves' tools."""
-        request = CharacterCreateRequest(name="Rogue", character_class="thief")
+        request = CharacterCreateRequest(
+            name="Rogue", character_class="thief", abilities=TEST_ABILITIES
+        )
         result = service.create_character("user-123", request)
 
         item_ids = [item["item_id"] for item in result["inventory"]]
@@ -122,7 +139,9 @@ class TestCreateCharacter:
 
     def test_create_cleric_has_starting_equipment(self, service, mock_db):
         """Cleric gets mace, shield, holy symbol."""
-        request = CharacterCreateRequest(name="Priest", character_class="cleric")
+        request = CharacterCreateRequest(
+            name="Priest", character_class="cleric", abilities=TEST_ABILITIES
+        )
         result = service.create_character("user-123", request)
 
         item_ids = [item["item_id"] for item in result["inventory"]]
@@ -133,7 +152,9 @@ class TestCreateCharacter:
 
     def test_create_magic_user_has_starting_equipment(self, service, mock_db):
         """Magic user gets dagger, staff, spellbook, robes."""
-        request = CharacterCreateRequest(name="Wizard", character_class="magic_user")
+        request = CharacterCreateRequest(
+            name="Wizard", character_class="magic_user", abilities=TEST_ABILITIES
+        )
         result = service.create_character("user-123", request)
 
         item_ids = [item["item_id"] for item in result["inventory"]]
@@ -144,7 +165,9 @@ class TestCreateCharacter:
 
     def test_create_character_inventory_has_proper_structure(self, service, mock_db):
         """Inventory items have complete structure."""
-        request = CharacterCreateRequest(name="Test", character_class="fighter")
+        request = CharacterCreateRequest(
+            name="Test", character_class="fighter", abilities=TEST_ABILITIES
+        )
         result = service.create_character("user-123", request)
 
         for item in result["inventory"]:

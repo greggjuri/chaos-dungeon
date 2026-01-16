@@ -9,6 +9,17 @@ from moto import mock_aws
 from character.handler import lambda_handler, reset_service
 
 
+# Standard test abilities for character creation
+TEST_ABILITIES = {
+    "strength": 14,
+    "intelligence": 10,
+    "wisdom": 12,
+    "dexterity": 13,
+    "constitution": 15,
+    "charisma": 11,
+}
+
+
 @pytest.fixture(autouse=True)
 def reset_handler():
     """Reset handler state before each test."""
@@ -54,7 +65,7 @@ class TestCreateCharacter:
         event = make_event(
             "POST",
             "/characters",
-            body={"name": "Thorin", "character_class": "fighter"},
+            body={"name": "Thorin", "character_class": "fighter", "abilities": TEST_ABILITIES},
         )
 
         response = lambda_handler(event, MagicMock())
@@ -74,7 +85,7 @@ class TestCreateCharacter:
         event = make_event(
             "POST",
             "/characters",
-            body={"name": "Test", "character_class": "invalid"},
+            body={"name": "Test", "character_class": "invalid", "abilities": TEST_ABILITIES},
         )
 
         response = lambda_handler(event, MagicMock())
@@ -87,7 +98,7 @@ class TestCreateCharacter:
         event = make_event(
             "POST",
             "/characters",
-            body={"character_class": "fighter"},
+            body={"character_class": "fighter", "abilities": TEST_ABILITIES},
         )
 
         response = lambda_handler(event, MagicMock())
@@ -100,7 +111,7 @@ class TestCreateCharacter:
         event = make_event(
             "POST",
             "/characters",
-            body={"name": "AB", "character_class": "fighter"},
+            body={"name": "AB", "character_class": "fighter", "abilities": TEST_ABILITIES},
         )
 
         response = lambda_handler(event, MagicMock())
@@ -113,7 +124,7 @@ class TestCreateCharacter:
         event = make_event(
             "POST",
             "/characters",
-            body={"name": "Test@#$", "character_class": "fighter"},
+            body={"name": "Test@#$", "character_class": "fighter", "abilities": TEST_ABILITIES},
         )
 
         response = lambda_handler(event, MagicMock())
@@ -125,7 +136,7 @@ class TestCreateCharacter:
         event = make_event(
             "POST",
             "/characters",
-            body={"name": "Test", "character_class": "fighter"},
+            body={"name": "Test", "character_class": "fighter", "abilities": TEST_ABILITIES},
             user_id=None,
         )
 
@@ -155,7 +166,7 @@ class TestListCharacters:
         create_event = make_event(
             "POST",
             "/characters",
-            body={"name": "Thorin", "character_class": "fighter"},
+            body={"name": "Thorin", "character_class": "fighter", "abilities": TEST_ABILITIES},
         )
         lambda_handler(create_event, MagicMock())
 
@@ -190,7 +201,7 @@ class TestGetCharacter:
         create_event = make_event(
             "POST",
             "/characters",
-            body={"name": "Thorin", "character_class": "fighter"},
+            body={"name": "Thorin", "character_class": "fighter", "abilities": TEST_ABILITIES},
         )
         create_response = lambda_handler(create_event, MagicMock())
         character_id = json.loads(create_response["body"])["character_id"]
@@ -252,7 +263,7 @@ class TestUpdateCharacter:
         create_event = make_event(
             "POST",
             "/characters",
-            body={"name": "Thorin", "character_class": "fighter"},
+            body={"name": "Thorin", "character_class": "fighter", "abilities": TEST_ABILITIES},
         )
         create_response = lambda_handler(create_event, MagicMock())
         character_id = json.loads(create_response["body"])["character_id"]
@@ -294,7 +305,7 @@ class TestUpdateCharacter:
         create_event = make_event(
             "POST",
             "/characters",
-            body={"name": "Thorin", "character_class": "fighter"},
+            body={"name": "Thorin", "character_class": "fighter", "abilities": TEST_ABILITIES},
         )
         create_response = lambda_handler(create_event, MagicMock())
         character_id = json.loads(create_response["body"])["character_id"]
@@ -323,7 +334,7 @@ class TestDeleteCharacter:
         create_event = make_event(
             "POST",
             "/characters",
-            body={"name": "Thorin", "character_class": "fighter"},
+            body={"name": "Thorin", "character_class": "fighter", "abilities": TEST_ABILITIES},
         )
         create_response = lambda_handler(create_event, MagicMock())
         character_id = json.loads(create_response["body"])["character_id"]
@@ -361,7 +372,7 @@ class TestDeleteCharacter:
         create_event = make_event(
             "POST",
             "/characters",
-            body={"name": "Thorin", "character_class": "fighter"},
+            body={"name": "Thorin", "character_class": "fighter", "abilities": TEST_ABILITIES},
         )
         create_response = lambda_handler(create_event, MagicMock())
         character_id = json.loads(create_response["body"])["character_id"]
