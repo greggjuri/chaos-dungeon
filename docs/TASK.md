@@ -12,6 +12,12 @@ None currently.
 
 ## Recently Completed
 
+### Commerce Auto-Execute (prp-18e)
+- [x] Auto-execute sell when DM uses blocked inventory_remove during sell action
+- [x] Auto-execute buy when DM uses blocked inventory_add + negative gold during buy action
+- [x] Capture blocked values before clearing to use as intent signal
+- [x] Proper validation: items must exist, gold must be sufficient
+
 ### Commerce Lockdown (prp-18d)
 - [x] Block ALL gold_delta (positive AND negative) from DM
 - [x] Block ALL inventory_remove from DM
@@ -142,4 +148,4 @@ Comprehensive lockdown of item/gold acquisition:
 
 ---
 
-*Last updated: 2026-01-15 (commerce lockdown PRP-18d complete)*
+*Last updated: 2026-01-16 (commerce auto-execute PRP-18e complete)*

@@ -1293,8 +1293,10 @@ class DMService:
         if should_initiate_combat:
             self._initiate_combat(session, dm_response.enemies)
 
-        # Apply state changes
-        character, session = self._apply_state_changes(character, session, dm_response)
+        # Apply state changes (pass action for auto-execute commerce fallback)
+        character, session = self._apply_state_changes(
+            character, session, dm_response, action=action
+        )
 
         # Update message history
         session = self._append_messages(session, action, dm_response.narrative)
@@ -1573,11 +1575,137 @@ class DMService:
                     return i
         return None
 
+    def _auto_execute_commerce(
+        self,
+        character: dict,
+        action: str,
+        blocked_items_remove: list[str] | None,
+        blocked_items_add: list[str] | None,
+        blocked_gold: int | None,
+    ) -> dict:
+        """Auto-execute commerce when DM uses old fields instead of commerce_* fields.
+
+        This is a fallback for when the DM ignores commerce_sell/commerce_buy instructions
+        and outputs gold_delta/inventory_remove instead. We capture the DM's intent from
+        the blocked fields and execute the transaction through proper channels.
+
+        Args:
+            character: Character dict (modified in place)
+            action: Player's action text
+            blocked_items_remove: Items DM tried to remove (captured before blocking)
+            blocked_items_add: Items DM tried to add (captured before blocking)
+            blocked_gold: Gold delta DM tried to apply (captured before blocking)
+
+        Returns:
+            Dict with "sold" (list), "bought" (list) of executed transactions
+        """
+        from shared.actions import is_buy_action, is_sell_action
+        from shared.items import ITEM_CATALOG
+
+        result: dict = {"sold": [], "bought": []}
+
+        # ============================================================
+        # AUTO-SELL: Detected sell action + DM tried to remove items
+        # ============================================================
+        if is_sell_action(action) and blocked_items_remove:
+            logger.info("COMMERCE_AUTO: Attempting auto-sell", extra={
+                "action": action[:100],
+                "items": blocked_items_remove,
+            })
+
+            inventory = character.get("inventory", [])
+
+            for item_name in blocked_items_remove:
+                # Normalize item name to ID
+                item_id = self._normalize_item_id(item_name)
+
+                # Find item in inventory
+                idx = self._find_inventory_item_index(inventory, item_id)
+
+                if idx is not None:
+                    # Get sell price (50% of catalog value, minimum 1)
+                    item_def = ITEM_CATALOG.get(item_id)
+                    sell_price = max(1, (item_def.value // 2) if item_def else 1)
+
+                    # Remove item (decrement quantity or pop)
+                    inv_item = inventory[idx]
+                    qty = inv_item.get("quantity", 1) if isinstance(inv_item, dict) else 1
+
+                    if qty > 1:
+                        inventory[idx]["quantity"] = qty - 1
+                        logger.info("COMMERCE_AUTO: Decremented quantity", extra={
+                            "item": item_id, "new_qty": qty - 1
+                        })
+                    else:
+                        inventory.pop(idx)
+                        logger.info("COMMERCE_AUTO: Removed item", extra={"item": item_id})
+
+                    # Add gold
+                    character["gold"] = character.get("gold", 0) + sell_price
+
+                    result["sold"].append({"item": item_id, "gold": sell_price})
+                    logger.info("COMMERCE_AUTO: Item sold", extra={
+                        "item": item_id,
+                        "gold": sell_price,
+                        "character_gold": character["gold"],
+                    })
+                else:
+                    logger.warning("COMMERCE_AUTO: Item not in inventory", extra={
+                        "item": item_name,
+                        "item_id": item_id,
+                    })
+
+        # ============================================================
+        # AUTO-BUY: Detected buy action + DM tried to add items + negative gold
+        # ============================================================
+        if is_buy_action(action) and blocked_items_add and blocked_gold and blocked_gold < 0:
+            logger.info("COMMERCE_AUTO: Attempting auto-buy", extra={
+                "action": action[:100],
+                "items": blocked_items_add,
+                "gold_cost": abs(blocked_gold),
+            })
+
+            cost = abs(blocked_gold)
+            current_gold = character.get("gold", 0)
+
+            if cost <= current_gold:
+                for item_name in blocked_items_add:
+                    item_id = self._normalize_item_id(item_name)
+                    item_def = ITEM_CATALOG.get(item_id)
+
+                    if item_def:
+                        # Deduct gold (split evenly if multiple items)
+                        item_cost = cost // len(blocked_items_add)
+                        character["gold"] = character.get("gold", 0) - item_cost
+
+                        # Add item to inventory
+                        self._add_item_to_inventory(character, item_def)
+
+                        result["bought"].append({"item": item_id, "gold": item_cost})
+                        logger.info("COMMERCE_AUTO: Item bought", extra={
+                            "item": item_id,
+                            "gold": item_cost,
+                            "character_gold": character["gold"],
+                        })
+                    else:
+                        logger.warning("COMMERCE_AUTO: Unknown item in catalog", extra={
+                            "item": item_name,
+                            "item_id": item_id,
+                        })
+            else:
+                logger.warning("COMMERCE_AUTO: Insufficient gold for purchase", extra={
+                    "cost": cost,
+                    "gold": current_gold,
+                })
+
+        return result
+
     def _apply_state_changes(
         self,
         character: dict,
         session: dict,
         dm_response: DMResponse,
+        action: str = "",
     ) -> tuple[dict, dict]:
         """Apply state changes from DM response.
 
@@ -1585,10 +1713,15 @@ class DMService:
         All resource acquisition is controlled by the server through
         authorized channels (combat loot, shops/commerce, quests).
 
+        AUTO-EXECUTE COMMERCE: When the DM ignores commerce_sell/commerce_buy
+        fields and uses blocked fields (gold_delta, inventory_remove, inventory_add),
+        we capture the intent and auto-execute the transaction if conditions match.
+
         Args:
             character: Character dict from DynamoDB
             session: Session dict from DynamoDB
             dm_response: Parsed DM response
+            action: Player's action text (for commerce detection)
 
         Returns:
             Updated (character, session) tuple
@@ -1602,6 +1735,14 @@ class DMService:
         commerce_result = self._process_commerce(character, state)
         if commerce_result.get("error"):
             logger.warning("Commerce error", extra={"error": commerce_result["error"]})
+
+        # ============================================================
+        # CAPTURE BLOCKED VALUES BEFORE CLEARING
+        # These are used for auto-execute commerce fallback
+        # ============================================================
+        blocked_gold = state.gold_delta if state.gold_delta != 0 else None
+        blocked_items_add = list(state.inventory_add) if state.inventory_add else None
+        blocked_items_remove = list(state.inventory_remove) if state.inventory_remove else None
 
         # ============================================================
         # ABSOLUTE BLOCK: DM CANNOT MODIFY GOLD OR ITEMS DIRECTLY
@@ -1628,6 +1769,22 @@ class DMService:
                 extra={"blocked_items": state.inventory_remove},
             )
             state.inventory_remove = []  # Block all item removals
+
+        # ============================================================
+        # AUTO-EXECUTE COMMERCE: Fallback for when DM ignores commerce_* fields
+        # If we blocked commerce-like fields during a commerce action,
+        # execute the transaction using the blocked data as intent signal
+        # ============================================================
+        if action and (blocked_items_remove or blocked_items_add):
+            auto_result = self._auto_execute_commerce(
+                character=character,
+                action=action,
+                blocked_items_remove=blocked_items_remove,
+                blocked_items_add=blocked_items_add,
+                blocked_gold=blocked_gold,
+            )
+            if auto_result.get("sold") or auto_result.get("bought"):
+                logger.info("COMMERCE_AUTO: Transaction completed", extra=auto_result)
 
         # Update character HP with bounds
         new_hp = character["hp"] + state.hp_delta

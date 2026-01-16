@@ -327,3 +327,215 @@ class TestNormalizeItemId:
     def test_strips_whitespace(self, dm_service):
         """Leading/trailing whitespace is stripped."""
         assert dm_service._normalize_item_id("  sword  ") == "sword"
+
+
+class TestCommerceAutoExecute:
+    """Tests for auto-execute commerce fallback (PRP-18e).
+
+    When the DM ignores commerce_sell/commerce_buy and uses blocked fields
+    (gold_delta, inventory_remove, inventory_add), we auto-execute the
+    transaction using the blocked data as intent signal.
+    """
+
+    def test_auto_sell_removes_item_adds_gold(self, dm_service, sample_character):
+        """Auto-sell executes when DM uses inventory_remove during sell action."""
+        # Add a sword to inventory (value=10, sell price=5)
+        sample_character["inventory"] = [{
+            "item_id": "sword",
+            "name": "Sword",
+            "quantity": 1,
+            "item_type": "weapon",
+            "description": "A sword",
+        }]
+        sample_character["gold"] = 0
+
+        result = dm_service._auto_execute_commerce(
+            character=sample_character,
+            action="I want to sell my sword",
+            blocked_items_remove=["sword"],
+            blocked_items_add=None,
+            blocked_gold=5,  # DM tried to add gold
+        )
+
+        assert len(result["sold"]) == 1
+        assert result["sold"][0]["item"] == "sword"
+        assert result["sold"][0]["gold"] == 5  # 50% of 10
+        assert sample_character["gold"] == 5
+        assert len(sample_character["inventory"]) == 0
+
+    def test_auto_sell_decrements_quantity(self, dm_service, sample_character):
+        """Auto-sell decrements quantity when item has qty > 1."""
+        sample_character["inventory"] = [{
+            "item_id": "torch",
+            "name": "Torch",
+            "quantity": 5,
+            "item_type": "misc",
+            "description": "A torch",
+        }]
+        sample_character["gold"] = 0
+
+        result = dm_service._auto_execute_commerce(
+            character=sample_character,
+            action="sell my torch",
+            blocked_items_remove=["torch"],
+            blocked_items_add=None,
+            blocked_gold=1,
+        )
+
+        assert len(result["sold"]) == 1
+        assert sample_character["inventory"][0]["quantity"] == 4
+        assert sample_character["gold"] == 1  # torch value=1, 50%=0, min=1
+
+    def test_auto_sell_skips_missing_items(self, dm_service, sample_character):
+        """Items not in inventory are not auto-sold."""
+        sample_character["inventory"] = []
+        sample_character["gold"] = 0
+
+        result = dm_service._auto_execute_commerce(
+            character=sample_character,
+            action="I sell my shield",
+            blocked_items_remove=["shield"],
+            blocked_items_add=None,
+            blocked_gold=20,
+        )
+
+        assert len(result["sold"]) == 0
+        assert sample_character["gold"] == 0  # Unchanged
+
+    def test_auto_sell_only_on_sell_action(self, dm_service, sample_character):
+        """Auto-sell doesn't trigger for non-sell actions."""
+        sample_character["inventory"] = [{
+            "item_id": "sword",
+            "name": "Sword",
+            "quantity": 1,
+            "item_type": "weapon",
+            "description": "A sword",
+        }]
+        sample_character["gold"] = 0
+
+        result = dm_service._auto_execute_commerce(
+            character=sample_character,
+            action="I attack with my sword",  # Not a sell action
+            blocked_items_remove=["sword"],
+            blocked_items_add=None,
+            blocked_gold=None,
+        )
+
+        assert len(result["sold"]) == 0
+        assert len(sample_character["inventory"]) == 1  # Unchanged
+
+    def test_auto_buy_deducts_gold_adds_item(self, dm_service, sample_character):
+        """Auto-buy executes when DM uses inventory_add during buy action."""
+        sample_character["inventory"] = []
+        sample_character["gold"] = 50
+
+        result = dm_service._auto_execute_commerce(
+            character=sample_character,
+            action="I want to buy a dagger",
+            blocked_items_remove=None,
+            blocked_items_add=["dagger"],
+            blocked_gold=-3,  # DM tried to deduct gold
+        )
+
+        assert len(result["bought"]) == 1
+        assert result["bought"][0]["item"] == "dagger"
+        assert result["bought"][0]["gold"] == 3
+        assert sample_character["gold"] == 47
+        assert len(sample_character["inventory"]) == 1
+        assert sample_character["inventory"][0]["item_id"] == "dagger"
+
+    def test_auto_buy_requires_negative_gold(self, dm_service, sample_character):
+        """Auto-buy only triggers when DM tried to deduct gold (negative)."""
+        sample_character["inventory"] = []
+        sample_character["gold"] = 50
+
+        result = dm_service._auto_execute_commerce(
+            character=sample_character,
+            action="I want to buy a dagger",
+            blocked_items_remove=None,
+            blocked_items_add=["dagger"],
+            blocked_gold=3,  # Positive gold (wrong direction)
+        )
+
+        assert len(result["bought"]) == 0
+        assert sample_character["gold"] == 50  # Unchanged
+
+    def test_auto_buy_insufficient_gold(self, dm_service, sample_character):
+        """Auto-buy fails if player doesn't have enough gold."""
+        sample_character["inventory"] = []
+        sample_character["gold"] = 5
+
+        result = dm_service._auto_execute_commerce(
+            character=sample_character,
+            action="I want to buy a sword",
+            blocked_items_remove=None,
+            blocked_items_add=["sword"],
+            blocked_gold=-10,  # Sword costs 10, player has 5
+        )
+
+        assert len(result["bought"]) == 0
+        assert sample_character["gold"] == 5  # Unchanged
+        assert len(sample_character["inventory"]) == 0
+
+    def test_auto_buy_skips_unknown_items(self, dm_service, sample_character):
+        """Items not in catalog are not auto-bought."""
+        sample_character["inventory"] = []
+        sample_character["gold"] = 100
+
+        result = dm_service._auto_execute_commerce(
+            character=sample_character,
+            action="I want to buy a vorpal blade",
+            blocked_items_remove=None,
+            blocked_items_add=["vorpal_blade"],
+            blocked_gold=-50,
+        )
+
+        assert len(result["bought"]) == 0
+        assert sample_character["gold"] == 100  # Unchanged
+
+    def test_no_auto_execute_without_action(self, dm_service, sample_character):
+        """Empty action string prevents auto-execute."""
+        sample_character["inventory"] = [{
+            "item_id": "sword",
+            "name": "Sword",
+            "quantity": 1,
+            "item_type": "weapon",
+            "description": "A sword",
+        }]
+        sample_character["gold"] = 50
+
+        # This would be a sell, but no action provided
+        result = dm_service._auto_execute_commerce(
+            character=sample_character,
+            action="",  # Empty action
+            blocked_items_remove=["sword"],
+            blocked_items_add=None,
+            blocked_gold=5,
+        )
+
+        assert len(result["sold"]) == 0
+        assert len(result["bought"]) == 0
+
+    def test_auto_sell_uses_correct_price(self, dm_service, sample_character):
+        """Auto-sell uses 50% of catalog value, ignoring DM's gold amount."""
+        # chain_mail has value=40, so sell price should be 20
+        sample_character["inventory"] = [{
+            "item_id": "chain_mail",
+            "name": "Chain Mail",
+            "quantity": 1,
+            "item_type": "armor",
+            "description": "Chain mail armor",
+        }]
+        sample_character["gold"] = 0
+
+        result = dm_service._auto_execute_commerce(
+            character=sample_character,
+            action="I sell my chain mail",
+            blocked_items_remove=["chain_mail"],
+            blocked_items_add=None,
+            blocked_gold=10,  # DM gave wrong amount - should be ignored
+        )
+
+        # Should use catalog price (40 / 2 = 20), not DM's 10
+        assert result["sold"][0]["gold"] == 20
+        assert sample_character["gold"] == 20
