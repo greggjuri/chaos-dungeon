@@ -545,6 +545,92 @@ def require_at_least_one(self) -> "ModelName":
 
 ---
 
+## ADR-013: Intent Translation Pattern for AI Behavior Recovery
+
+**Date**: 2026-01-16
+**Status**: Accepted
+
+### Context
+
+Despite clear prompt instructions, Mistral Small (our DM AI) ignored the new `commerce_sell` and `commerce_buy` JSON fields and continued using `gold_delta` and `inventory_remove` directly. After PRP-18d blocked these fields, commerce transactions stopped working entirely - players couldn't buy or sell anything.
+
+The pattern observed:
+```
+Player: "I want to sell my torch"
+DM outputs: { "gold_delta": 1, "inventory_remove": ["torch"] }
+Server: Blocks both fields
+Result: Nothing happens, player frustrated
+```
+
+### Decision
+
+Implement an **Intent Translation Pattern** that:
+1. Captures blocked field values BEFORE clearing them
+2. Detects the intended action type (sell/buy) from the player's input
+3. If conditions match, executes the transaction using the blocked data as intent signal
+
+```python
+# Capture before blocking
+blocked_gold = state.gold_delta
+blocked_items_remove = list(state.inventory_remove)
+
+# Block the fields (existing behavior)
+state.gold_delta = 0
+state.inventory_remove = []
+
+# Auto-execute if intent matches
+if is_sell_action(action) and blocked_items_remove:
+    # Execute sale using blocked_items_remove as the item list
+    # Use catalog price (50%), not DM's gold amount
+```
+
+### Rationale
+
+**Alternatives considered:**
+
+| Approach | Verdict |
+|----------|---------|
+| Better prompts | Failed - Mistral Small ignored multiple prompt iterations |
+| Different model | Expensive - would increase costs significantly |
+| Remove blocking | Insecure - enables item/gold exploits |
+| Accept broken commerce | Poor UX - core feature unusable |
+| **Intent translation** | **Selected** - works with model behavior |
+
+**Key insight**: The AI is trying to do the right thing with the wrong mechanism. Rather than fighting this behavior, we translate its intent into the correct action.
+
+**Benefits:**
+- Works with the model's natural tendencies instead of against them
+- Maintains security (blocking still in place)
+- Graceful recovery without additional AI calls
+- Pattern is reusable for similar issues
+
+### Consequences
+
+**Positive:**
+- Commerce transactions work despite DM using wrong fields
+- No additional prompt tuning required
+- No cost increase (server-side logic only)
+- Establishes pattern for handling AI behavior mismatches
+
+**Negative:**
+- Slightly more complex server code
+- Two code paths for same action (proper fields vs auto-execute)
+- Need to ensure both paths produce consistent results
+
+**Pattern applicability:**
+This pattern is useful when:
+1. AI's intent is correct but mechanism is wrong
+2. The "wrong" mechanism can be detected and blocked
+3. Blocked data contains enough information to execute correctly
+4. Action type can be inferred from player input
+
+### References
+
+- PRP: `prps/prp-18e-commerce-auto-execute.md`
+- Init spec: `initials/init-18e-commerce-auto-execute.md`
+
+---
+
 ## Template for New Decisions
 
 ```markdown

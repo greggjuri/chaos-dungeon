@@ -1,6 +1,6 @@
 # Chaos Dungeon - Task Tracker
 
-## Current Sprint: Inventory System Polish
+## Current Sprint: Game Systems
 
 ### In Progress
 None currently.
@@ -95,6 +95,11 @@ None currently.
 - [x] prp-18a-item-authority.md - Item authority lockdown, DM cannot grant items/gold, server-side loot claim
 - [x] prp-18b-loot-debug.md - LOOT_FLOW diagnostic logging, multi-word enemy name fix
 
+### Commerce System
+- [x] prp-18c-commerce.md - Server-side buy/sell with commerce_sell/commerce_buy fields
+- [x] prp-18d-commerce-lockdown.md - Block ALL gold_delta and inventory_remove from DM
+- [x] prp-18e-commerce-auto-execute.md - Intent translation fallback for DM behavior
+
 ---
 
 ## Architecture Decisions
@@ -127,6 +132,19 @@ Comprehensive lockdown of item/gold acquisition:
 - Server claims loot when search action detected + pending_loot exists
 - DM prompts updated with manipulation resistance examples
 - Closes exploit vectors: corpse re-looting, exploration looting, item wishing
+
+### Implemented: Commerce System (prp-18c/18d/18e)
+Complete server-side commerce with DM intent translation:
+- `commerce_sell` and `commerce_buy` fields for DM to signal transactions
+- All `gold_delta`, `inventory_add`, `inventory_remove` blocked from DM
+- **Auto-execute fallback (18e)**: When DM ignores commerce fields and uses blocked fields, capture intent and execute correctly
+- Pattern: "Translate intent, don't fight behavior" - work with the model's tendencies
+
+### Key Learnings from Commerce System (prp-18c/18d/18e)
+1. **Intent translation > rejection** - When AI uses wrong mechanism for right intent, translate rather than reject
+2. **Capture before clear** - Save blocked values before zeroing to enable fallback behavior
+3. **Layered defense** - Prompts guide, blocking enforces, auto-execute recovers
+4. **Test the full loop** - Unit tests pass but manual testing reveals DM behavior issues
 
 ---
 
