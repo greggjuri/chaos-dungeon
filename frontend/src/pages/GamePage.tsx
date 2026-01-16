@@ -3,19 +3,26 @@
  */
 import { useState, useCallback, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { Package, User } from 'lucide-react';
 import { useGameSession } from '../hooks';
 import {
   ActionInput,
+  CharacterSheet,
   CharacterStatus,
   ChatHistory,
   CombatStatus,
   CombatUI,
   DeathScreen,
   InventoryPanel,
+  KeyboardHint,
+  PanelOverlay,
   TokenCounter,
 } from '../components/game';
 import { Button, Card, Loading } from '../components';
 import { Item } from '../types';
+
+/** Panel type for overlay system */
+type PanelType = 'inventory' | 'character' | null;
 
 /**
  * Main game page with chat interface, character status,
@@ -23,8 +30,7 @@ import { Item } from '../types';
  */
 export function GamePage() {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const [showInventory, setShowInventory] = useState(false);
-  const [inventoryHeight, setInventoryHeight] = useState(200);
+  const [activePanel, setActivePanel] = useState<PanelType>(null);
 
   // Prevent document-level scrolling on game page
   useEffect(() => {
@@ -44,6 +50,40 @@ export function GamePage() {
       html.style.overflow = originalHtmlOverflow;
       body.style.overflow = originalBodyOverflow;
     };
+  }, []);
+
+  // Keyboard shortcuts for panel navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if typing in input/textarea
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      // Skip if modifier keys held
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      switch (e.key.toLowerCase()) {
+        case 'i':
+          e.preventDefault();
+          setActivePanel((prev) => (prev === 'inventory' ? null : 'inventory'));
+          break;
+        case 'c':
+          e.preventDefault();
+          setActivePanel((prev) => (prev === 'character' ? null : 'character'));
+          break;
+        case 'escape':
+          e.preventDefault();
+          setActivePanel(null);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const {
@@ -76,30 +116,14 @@ export function GamePage() {
   // Get current inventory from character or snapshot
   const getInventoryItems = useCallback((): Item[] => {
     if (!character) return [];
-    // Character has full Item objects
-    return character.inventory;
-  }, [character]);
+    // Use snapshot inventory if available (most recent), otherwise character
+    return characterSnapshot?.inventory ?? character.inventory;
+  }, [character, characterSnapshot]);
 
-  // Handle inventory panel resize via drag
-  const handleInventoryDragStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    const startY = e.clientY;
-    const startHeight = inventoryHeight;
-
-    const handleMove = (moveEvent: MouseEvent) => {
-      const delta = moveEvent.clientY - startY;
-      const newHeight = Math.max(100, Math.min(startHeight + delta, window.innerHeight * 0.5));
-      setInventoryHeight(newHeight);
-    };
-
-    const handleUp = () => {
-      document.removeEventListener('mousemove', handleMove);
-      document.removeEventListener('mouseup', handleUp);
-    };
-
-    document.addEventListener('mousemove', handleMove);
-    document.addEventListener('mouseup', handleUp);
-  }, [inventoryHeight]);
+  // Panel handlers
+  const closePanel = useCallback(() => setActivePanel(null), []);
+  const openInventory = useCallback(() => setActivePanel('inventory'), []);
+  const openCharacter = useCallback(() => setActivePanel('character'), []);
 
   // Show loading state
   if (isLoading) {
@@ -115,7 +139,7 @@ export function GamePage() {
     return (
       <div className="max-w-md mx-auto text-center py-12">
         <Card>
-          <div className="text-red-400 text-4xl mb-4">⚠️</div>
+          <div className="text-red-400 text-4xl mb-4">Warning</div>
           <h1 className="text-xl font-bold text-white mb-2">
             Failed to Load Session
           </h1>
@@ -156,38 +180,13 @@ export function GamePage() {
     <div className="flex flex-col h-[calc(100vh-178px)] bg-gray-900 overflow-hidden">
       {/* Fixed header section - never scrolls */}
       <header className="flex-shrink-0 bg-gray-900 z-10">
-        {/* Character status bar */}
-        <CharacterStatus character={character} snapshot={characterSnapshot} />
-
-        {/* Inventory toggle bar */}
-        <div className="bg-gray-800/50 border-b border-gray-700 px-4 py-1">
-          <button
-            onClick={() => setShowInventory(!showInventory)}
-            className="text-amber-400 hover:text-amber-300 text-sm font-medium flex items-center gap-1"
-          >
-            <span>{showInventory ? '▼' : '▶'}</span>
-            <span>Inventory ({inventoryItems.length})</span>
-          </button>
-        </div>
-
-        {/* Collapsible inventory panel with resizable height */}
-        {showInventory && (
-          <div
-            className="bg-gray-800/80 border-b border-gray-700 overflow-y-auto relative"
-            style={{ height: `${inventoryHeight}px` }}
-          >
-            <InventoryPanel
-              items={inventoryItems}
-              inCombat={combatActive || (combat?.active ?? false)}
-              onUseItem={handleUseItem}
-            />
-            {/* Drag handle for resizing */}
-            <div
-              className="absolute bottom-0 left-0 right-0 h-2 bg-gray-700 cursor-ns-resize hover:bg-amber-600 transition-colors"
-              onMouseDown={handleInventoryDragStart}
-            />
-          </div>
-        )}
+        {/* Character status bar with panel icons */}
+        <CharacterStatus
+          character={character}
+          snapshot={characterSnapshot}
+          onInventoryClick={openInventory}
+          onCharacterClick={openCharacter}
+        />
 
         {/* Error toast */}
         {error && (
@@ -239,8 +238,35 @@ export function GamePage() {
         </div>
       )}
 
+      {/* Keyboard hint - shown when no panel is open */}
+      <KeyboardHint visible={activePanel === null} />
+
       {/* Token counter overlay - toggle with 'T' key */}
       <TokenCounter usage={usage} />
+
+      {/* Inventory Panel Overlay */}
+      <PanelOverlay
+        isOpen={activePanel === 'inventory'}
+        onClose={closePanel}
+        title="Inventory"
+        icon={<Package size={20} />}
+      >
+        <InventoryPanel
+          items={inventoryItems}
+          inCombat={combatActive || (combat?.active ?? false)}
+          onUseItem={handleUseItem}
+        />
+      </PanelOverlay>
+
+      {/* Character Sheet Panel Overlay */}
+      <PanelOverlay
+        isOpen={activePanel === 'character'}
+        onClose={closePanel}
+        title="Character"
+        icon={<User size={20} />}
+      >
+        <CharacterSheet character={character} snapshot={characterSnapshot} />
+      </PanelOverlay>
     </div>
   );
 }

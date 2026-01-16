@@ -12,6 +12,14 @@ None currently.
 
 ## Recently Completed
 
+### Keyboard Shortcuts & Panel Overlays (prp-19)
+- [x] Keyboard shortcuts: I (inventory), C (character), Escape (close)
+- [x] Panel overlay system with centered modal dialogs
+- [x] CharacterSheet component showing name, class, level, HP, XP, gold, ability scores
+- [x] Icon buttons in status bar (Package, User icons via lucide-react)
+- [x] KeyboardHint footer text showing available shortcuts
+- [x] Removed collapsible inventory panel, replaced with modal overlay
+
 ### Commerce Auto-Execute (prp-18e)
 - [x] Auto-execute sell when DM uses blocked inventory_remove during sell action
 - [x] Auto-execute buy when DM uses blocked inventory_add + negative gold during buy action
@@ -43,7 +51,7 @@ None currently.
 ### Phase 4 - Polish
 - [ ] init-13-save-slots.md - Multiple characters/campaigns
 - [ ] init-14-session-resume.md - Continue saved games
-- [ ] init-15-character-sheet.md - Detailed character view
+- [x] init-15-character-sheet.md - Detailed character view (implemented as prp-19-keyboard-shortcuts)
 
 ### Phase 5 - Advanced Features
 - [ ] Spell system for Magic-Users and Clerics
@@ -74,6 +82,7 @@ None currently.
 ### UI & Game Interface
 - [x] init-08-game-ui.md - Chat interface with message history, character status, combat display
 - [x] Token counter UI - Debug overlay showing session/global token usage (press T to toggle)
+- [x] prp-19-keyboard-shortcuts.md - Keyboard navigation, panel overlays, character sheet view
 
 ### Cost Control
 - [x] prp-10-cost-protection.md - Application-level cost protection with token limits
@@ -166,4 +175,4 @@ Complete server-side commerce with DM intent translation:
 
 ---
 
-*Last updated: 2026-01-16 (commerce auto-execute PRP-18e complete)*
+*Last updated: 2026-01-16 (keyboard shortcuts and panel overlays PRP-19 complete)*

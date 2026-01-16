@@ -1,11 +1,14 @@
 /**
  * Character status bar component.
  */
+import { Package, User } from 'lucide-react';
 import { Character, CharacterSnapshot, CharacterClass } from '../../types';
 
 interface Props {
   character: Character;
   snapshot: CharacterSnapshot | null;
+  onInventoryClick?: () => void;
+  onCharacterClick?: () => void;
 }
 
 const CLASS_DISPLAY: Record<CharacterClass, string> = {
@@ -29,8 +32,14 @@ function getHpColor(current: number, max: number): string {
 /**
  * Top status bar showing character info, HP, XP, and Gold.
  * Uses snapshot values when available (updated after actions).
+ * Includes icon buttons for inventory and character sheet panels.
  */
-export function CharacterStatus({ character, snapshot }: Props) {
+export function CharacterStatus({
+  character,
+  snapshot,
+  onInventoryClick,
+  onCharacterClick,
+}: Props) {
   // Use snapshot values if available, fall back to character
   const hp = snapshot?.hp ?? character.hp;
   const maxHp = snapshot?.max_hp ?? character.max_hp;
@@ -86,6 +95,26 @@ export function CharacterStatus({ character, snapshot }: Props) {
           <div className="flex items-center gap-1">
             <span className="text-gray-400">Gold:</span>
             <span className="text-yellow-400">{gold}</span>
+          </div>
+
+          {/* Panel icons */}
+          <div className="flex items-center gap-1 ml-2 border-l border-gray-600 pl-2">
+            <button
+              onClick={onInventoryClick}
+              className="text-gray-500 hover:text-gray-300 transition-colors p-1"
+              title="Inventory (I)"
+              aria-label="Open inventory"
+            >
+              <Package size={18} />
+            </button>
+            <button
+              onClick={onCharacterClick}
+              className="text-gray-500 hover:text-gray-300 transition-colors p-1"
+              title="Character (C)"
+              aria-label="Open character sheet"
+            >
+              <User size={18} />
+            </button>
           </div>
         </div>
       </div>
