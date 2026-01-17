@@ -6,11 +6,20 @@
 None currently.
 
 ### Up Next
-- [ ] init-17-player-agency.md - DM prompt fixes for player agency (stop moral railroading on dark actions)
+- [ ] init-11-dice-rolling.md - Dice mechanics with UI display
+- [ ] init-12-leveling.md - XP and level progression
 
 ---
 
 ## Recently Completed
+
+### Player Agency (prp-17)
+- [x] Added PLAYER_AGENCY_RULES to DM system prompt
+- [x] Defined player vs DM control boundaries (player controls character, DM controls world)
+- [x] Added pacing rules: no fast-forwarding, ask "What do you do?" after actions
+- [x] Concrete examples of wrong vs right handling for violence and romance
+- [x] Added COMBAT_INITIATION rules for player-initiated violence against non-hostiles
+- [x] Compact versions for cost optimization
 
 ### Keyboard Shortcuts & Panel Overlays (prp-19)
 - [x] Keyboard shortcuts: I (inventory), C (character), Escape (close)
@@ -171,8 +180,8 @@ Complete server-side commerce with DM intent translation:
 - Protection: Real-time token limits (ADR-010)
 
 ### Known Issues
-- DM sometimes overrides player agency on dark/violent actions (init-17 will fix)
+None currently tracked.
 
 ---
 
-*Last updated: 2026-01-16 (keyboard shortcuts and panel overlays PRP-19 complete)*
+*Last updated: 2026-01-17 (player agency PRP-17 complete)*
