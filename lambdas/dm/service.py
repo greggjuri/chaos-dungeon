@@ -56,6 +56,12 @@ MAX_MESSAGE_HISTORY = 50
 # Model provider: "mistral" (Bedrock) or "claude" (Anthropic API)
 MODEL_PROVIDER = os.environ.get("MODEL_PROVIDER", "mistral")
 
+# Hostility classification prompt for combat confirmation
+HOSTILITY_CHECK_PROMPT = """Based on the current scene, is "{target}" currently hostile toward the player?
+Consider: Have they attacked? Threatened? Are they an enemy combatant?
+Being unfriendly, rude, or an obstacle is NOT hostile.
+Reply with ONLY one word: HOSTILE or NON_HOSTILE"""
+
 
 class AIClient(Protocol):
     """Protocol for AI client interface (Claude or Bedrock)."""
@@ -147,6 +153,272 @@ class DMService:
             )
             return None
 
+    def _check_target_hostility(
+        self,
+        target: str,
+        session: dict,
+        character: dict,
+        user_id: str,
+    ) -> bool:
+        """Ask the DM to classify target hostility.
+
+        Used by combat confirmation to determine if target is hostile
+        and can be attacked without confirmation.
+
+        Args:
+            target: The target name/description
+            session: Current session dict for context
+            character: Current character dict for context
+            user_id: User ID for building context
+
+        Returns:
+            True if target is hostile, False otherwise
+        """
+        from shared.models import AbilityScores, Character, Item, Message, Session
+
+        # Build minimal context for hostility check
+        character_id = session["character_id"]
+        campaign = session.get("campaign_setting", "default")
+
+        char_model = Character(
+            character_id=character_id,
+            user_id=user_id,
+            name=character["name"],
+            character_class=character["character_class"],
+            level=character["level"],
+            xp=character["xp"],
+            hp=character["hp"],
+            max_hp=character["max_hp"],
+            gold=character["gold"],
+            abilities=AbilityScores(**character["stats"]),
+            inventory=[
+                Item(**item) if isinstance(item, dict) else Item(name=item)
+                for item in character.get("inventory", [])
+            ],
+        )
+
+        sess_model = Session(
+            session_id=session.get("SK", "").replace("SESS#", ""),
+            user_id=user_id,
+            character_id=character_id,
+            campaign_setting=campaign,
+            current_location=session.get("current_location", "Unknown"),
+            world_state=session.get("world_state", {}),
+            message_history=[Message(**m) for m in session.get("message_history", [])],
+        )
+
+        context = self.prompt_builder.build_context(char_model, sess_model)
+        prompt = HOSTILITY_CHECK_PROMPT.format(target=target)
+
+        try:
+            ai_client = self._get_ai_client()
+            response = ai_client.send_action(
+                system_prompt="You are a classifier. Answer only HOSTILE or NON_HOSTILE.",
+                context=context,
+                action=prompt,
+            )
+
+            # Parse response - default to NON_HOSTILE if unclear (safer)
+            response_text = response.text.strip().upper()
+            is_hostile = "HOSTILE" in response_text and "NON_HOSTILE" not in response_text
+
+            logger.info(
+                "Hostility classification result",
+                extra={
+                    "target": target,
+                    "response": response_text[:50],
+                    "is_hostile": is_hostile,
+                },
+            )
+
+            return is_hostile
+        except Exception as e:
+            logger.warning(
+                "Hostility check failed, defaulting to NON_HOSTILE",
+                extra={"target": target, "error": str(e)},
+            )
+            return False  # Default to non-hostile (safer - will ask for confirmation)
+
+    def _request_combat_confirmation(
+        self,
+        session: dict,
+        character: dict,
+        target: str,
+        options: "GameOptions",
+        user_id: str,
+        session_id: str,
+    ) -> ActionResponse:
+        """Request player confirmation before attacking non-hostile target.
+
+        Calls the DM to generate a narrative asking for confirmation.
+
+        Args:
+            session: Session dict
+            character: Character dict
+            target: Target name to confirm attack on
+            options: Game options
+            user_id: User ID
+            session_id: Session ID
+
+        Returns:
+            ActionResponse asking for confirmation
+        """
+        from shared.models import (
+            AbilityScores,
+            Character,
+            Item,
+            Message,
+            PendingCombatConfirmation,
+            Session,
+        )
+
+        # Build models for context
+        character_id = session["character_id"]
+        campaign = session.get("campaign_setting", "default")
+
+        char_model = Character(
+            character_id=character_id,
+            user_id=user_id,
+            name=character["name"],
+            character_class=character["character_class"],
+            level=character["level"],
+            xp=character["xp"],
+            hp=character["hp"],
+            max_hp=character["max_hp"],
+            gold=character["gold"],
+            abilities=AbilityScores(**character["stats"]),
+            inventory=[
+                Item(**item) if isinstance(item, dict) else Item(name=item)
+                for item in character.get("inventory", [])
+            ],
+        )
+
+        sess_model = Session(
+            session_id=session_id,
+            user_id=user_id,
+            character_id=character_id,
+            campaign_setting=campaign,
+            current_location=session.get("current_location", "Unknown"),
+            world_state=session.get("world_state", {}),
+            message_history=[Message(**m) for m in session.get("message_history", [])],
+        )
+
+        # Build pending confirmation for context
+        pending = PendingCombatConfirmation(
+            target=target,
+            original_action="",  # Not needed for context formatting
+            reason="non-hostile",
+        )
+
+        # Build context with pending confirmation
+        system_prompt = self.prompt_builder.build_system_prompt(campaign)
+        context = self.prompt_builder.build_context(
+            char_model,
+            sess_model,
+            session,
+            action="",
+            options=options,
+            pending_confirmation=pending,
+        )
+
+        # Ask DM to narrate the confirmation request
+        try:
+            client = self._get_ai_client()
+            ai_response = client.send_action(
+                system_prompt,
+                context,
+                f"The player wants to attack {target}. Ask for confirmation.",
+            )
+
+            # Record usage
+            usage_stats = self._record_usage(session_id, ai_response)
+
+            narrative = ai_response.text.strip()
+        except Exception as e:
+            logger.warning(f"Failed to generate confirmation narrative: {e}")
+            narrative = (
+                f'You move to attack {target}, but they haven\'t shown any hostility. '
+                f"Are you sure you want to attack?"
+            )
+            usage_stats = None
+
+        # Update message history
+        session = self._append_messages(
+            session, f"[Attempting to attack {target}]", narrative
+        )
+
+        # Build inventory items
+        inventory_items = self._build_inventory_items(character.get("inventory", []))
+
+        return ActionResponse(
+            narrative=narrative,
+            state_changes=StateChanges(),
+            dice_rolls=[],
+            combat_active=False,
+            enemies=[],
+            combat=None,
+            character=CharacterSnapshot(
+                hp=character["hp"],
+                max_hp=character["max_hp"],
+                xp=character["xp"],
+                gold=character["gold"],
+                level=character["level"],
+                inventory=inventory_items,
+            ),
+            character_dead=False,
+            session_ended=False,
+            usage=usage_stats,
+            pending_confirmation=True,
+        )
+
+    def _narrate_action_cancelled(
+        self,
+        session: dict,
+        character: dict,
+        pending: "PendingCombatConfirmation",
+        user_id: str,
+        session_id: str,
+    ) -> ActionResponse:
+        """Narrate that the player cancelled their attack.
+
+        Args:
+            session: Session dict
+            character: Character dict
+            pending: The cancelled pending confirmation
+            user_id: User ID
+            session_id: Session ID
+
+        Returns:
+            ActionResponse acknowledging cancellation
+        """
+        narrative = f"You lower your weapon. {pending.target.title()} remains unaware of your intent."
+
+        # Update message history
+        session = self._append_messages(session, "[Cancelled attack]", narrative)
+
+        # Build inventory items
+        inventory_items = self._build_inventory_items(character.get("inventory", []))
+
+        return ActionResponse(
+            narrative=narrative,
+            state_changes=StateChanges(),
+            dice_rolls=[],
+            combat_active=False,
+            enemies=[],
+            combat=None,
+            character=CharacterSnapshot(
+                hp=character["hp"],
+                max_hp=character["max_hp"],
+                xp=character["xp"],
+                gold=character["gold"],
+                level=character["level"],
+                inventory=inventory_items,
+            ),
+            character_dead=False,
+            session_ended=False,
+            usage=None,
+        )
+
     def process_action(
         self,
         session_id: str,
@@ -203,9 +475,116 @@ class DMService:
             },
         )
 
+        # ================================================================
+        # COMBAT CONFIRMATION FLOW
+        # Handle pending combat confirmation before normal processing
+        # ================================================================
+        from shared.actions import (
+            detect_confirmation_response,
+            extract_attack_target,
+            is_attack_action,
+        )
+        from shared.models import GameOptions, PendingCombatConfirmation
+
+        # Load options from session
+        options_data = session.get("options", {})
+        game_options = GameOptions(**options_data) if options_data else GameOptions()
+
+        # Check for pending confirmation
+        pending_data = session.get("pending_combat_confirmation")
+        if pending_data:
+            pending_confirmation = PendingCombatConfirmation(**pending_data)
+            response_type = detect_confirmation_response(action)
+
+            logger.info(
+                "Processing pending combat confirmation",
+                extra={
+                    "target": pending_confirmation.target,
+                    "response_type": response_type,
+                    "action": action[:50],
+                },
+            )
+
+            if response_type == "confirm":
+                # Clear pending and process original action
+                session["pending_combat_confirmation"] = None
+                action = pending_confirmation.original_action
+                logger.info("Combat confirmed, processing original action")
+                # Fall through to normal processing with original action
+            elif response_type == "cancel":
+                # Clear pending, narrate cancellation
+                session["pending_combat_confirmation"] = None
+                response = self._narrate_action_cancelled(
+                    session, character, pending_confirmation, user_id, session_id
+                )
+                # Save updates and return
+                now = datetime.now(UTC).isoformat()
+                character["updated_at"] = now
+                session["updated_at"] = now
+                char_data = convert_floats_to_decimal(
+                    {k: v for k, v in character.items() if k not in ("PK", "SK")}
+                )
+                session_data = convert_floats_to_decimal(
+                    {k: v for k, v in session.items() if k not in ("PK", "SK")}
+                )
+                self.db.put_item(char_pk, char_sk, char_data)
+                self.db.put_item(session_pk, session_sk, session_data)
+                return response
+            else:
+                # New action - clear pending and process new action
+                session["pending_combat_confirmation"] = None
+                logger.info("New action detected, clearing pending confirmation")
+                # Fall through with new action
+
         # Check if we're in active combat
         combat_state = session.get("combat_state", {})
-        if combat_state.get("active"):
+        combat_active = combat_state.get("active", False)
+
+        # ================================================================
+        # NON-HOSTILE ATTACK CHECK
+        # If attacking a non-hostile target with confirmation enabled,
+        # ask the DM to classify and potentially request confirmation
+        # ================================================================
+        if (
+            game_options.confirm_combat_noncombat
+            and is_attack_action(action)
+            and not combat_active
+        ):
+            target = extract_attack_target(action)
+            if target:
+                logger.info(
+                    "Attack detected on potential non-hostile",
+                    extra={"target": target, "action": action[:50]},
+                )
+
+                is_hostile = self._check_target_hostility(
+                    target, session, character, user_id
+                )
+
+                if not is_hostile:
+                    # Set pending confirmation and return confirmation request
+                    session["pending_combat_confirmation"] = {
+                        "target": target,
+                        "original_action": action,
+                        "reason": "non-hostile",
+                        "created_at": datetime.now(UTC).isoformat(),
+                    }
+
+                    response = self._request_combat_confirmation(
+                        session, character, target, game_options, user_id, session_id
+                    )
+
+                    # Save updates and return
+                    now = datetime.now(UTC).isoformat()
+                    session["updated_at"] = now
+                    session_data = convert_floats_to_decimal(
+                        {k: v for k, v in session.items() if k not in ("PK", "SK")}
+                    )
+                    self.db.put_item(session_pk, session_sk, session_data)
+                    return response
+
+        # Normal processing path
+        if combat_active:
             response = self._process_combat_action(
                 session, character, action, user_id, session_id, combat_action
             )

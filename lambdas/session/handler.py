@@ -192,6 +192,33 @@ def delete_session(session_id: str) -> Response:
         raise APINotFoundError("Session not found") from None
 
 
+@app.patch("/sessions/<session_id>/options")
+@tracer.capture_method
+def update_options(session_id: str) -> dict[str, Any]:
+    """Update session options.
+
+    Args:
+        session_id: The session's ID
+
+    Returns:
+        200 response with updated options
+    """
+    from shared.models import GameOptions
+
+    user_id = get_user_id()
+
+    try:
+        body = app.current_event.json_body or {}
+        options = GameOptions(**body)
+    except ValidationError as e:
+        raise BadRequestError(str(e)) from None
+
+    try:
+        return get_service().update_options(user_id, session_id, options)
+    except NotFoundError:
+        raise APINotFoundError("Session not found") from None
+
+
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event: dict, context: LambdaContext) -> dict:

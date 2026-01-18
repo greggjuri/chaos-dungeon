@@ -12,6 +12,7 @@ import {
   LimitReachedResponse,
   ApiRequestError,
   CombatAction,
+  GameOptions,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
@@ -98,4 +99,13 @@ export const sessionService = {
 
     return response.json() as Promise<FullActionResponse>;
   },
+
+  /**
+   * Update session options (gore level, mature content, combat confirmation).
+   */
+  updateOptions: (sessionId: string, options: GameOptions) =>
+    request<{ options: GameOptions }>(`/sessions/${sessionId}/options`, {
+      method: 'PATCH',
+      body: JSON.stringify(options),
+    }),
 };

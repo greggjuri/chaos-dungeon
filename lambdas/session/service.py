@@ -251,3 +251,43 @@ class SessionService:
                 "session_id": session_id,
             },
         )
+
+    def update_options(
+        self, user_id: str, session_id: str, options: "GameOptions"
+    ) -> dict:
+        """Update session options.
+
+        Args:
+            user_id: User ID
+            session_id: Session ID
+            options: New options values
+
+        Returns:
+            Dict with updated options
+
+        Raises:
+            NotFoundError: If session doesn't exist
+        """
+        from shared.models import GameOptions
+
+        pk = f"USER#{user_id}"
+        sk = f"SESS#{session_id}"
+
+        # Verify session exists
+        item = self.db.get_item(pk, sk)
+        if not item:
+            raise NotFoundError("Session", session_id)
+
+        # Update options
+        self.db.update_item(pk, sk, {"options": options.model_dump()})
+
+        logger.info(
+            "Session options updated",
+            extra={
+                "user_id": user_id,
+                "session_id": session_id,
+                "options": options.model_dump(),
+            },
+        )
+
+        return {"options": options.model_dump()}

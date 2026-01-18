@@ -15,14 +15,16 @@ import {
   DeathScreen,
   InventoryPanel,
   KeyboardHint,
+  OptionsPanel,
   PanelOverlay,
   TokenCounter,
 } from '../components/game';
 import { Button, Card, Loading } from '../components';
-import { Item } from '../types';
+import { Item, GameOptions, DEFAULT_GAME_OPTIONS } from '../types';
+import { sessionService } from '../services/sessions';
 
 /** Panel type for overlay system */
-type PanelType = 'inventory' | 'character' | null;
+type PanelType = 'inventory' | 'character' | 'options' | null;
 
 /**
  * Main game page with chat interface, character status,
@@ -31,6 +33,8 @@ type PanelType = 'inventory' | 'character' | null;
 export function GamePage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const [activePanel, setActivePanel] = useState<PanelType>(null);
+  const [options, setOptions] = useState<GameOptions>(DEFAULT_GAME_OPTIONS);
+  const [isSavingOptions, setIsSavingOptions] = useState(false);
 
   // Prevent document-level scrolling on game page
   useEffect(() => {
@@ -75,6 +79,10 @@ export function GamePage() {
           e.preventDefault();
           setActivePanel((prev) => (prev === 'character' ? null : 'character'));
           break;
+        case 'o':
+          e.preventDefault();
+          setActivePanel((prev) => (prev === 'options' ? null : 'options'));
+          break;
         case 'escape':
           e.preventDefault();
           setActivePanel(null);
@@ -105,6 +113,31 @@ export function GamePage() {
     retryLoad,
   } = useGameSession(sessionId || '');
 
+  // Sync options from session when it loads
+  useEffect(() => {
+    if (session?.options) {
+      setOptions(session.options);
+    }
+  }, [session?.options]);
+
+  // Handle options change - save to server
+  const handleOptionsChange = useCallback(
+    async (newOptions: GameOptions) => {
+      if (!sessionId) return;
+      setOptions(newOptions);
+      setIsSavingOptions(true);
+      try {
+        await sessionService.updateOptions(sessionId, newOptions);
+      } catch (err) {
+        console.error('Failed to save options:', err);
+        // Revert on error - but keep UI responsive, so we don't revert
+      } finally {
+        setIsSavingOptions(false);
+      }
+    },
+    [sessionId]
+  );
+
   // Handle using an item from inventory (during combat)
   const handleUseItem = useCallback(
     (itemId: string) => {
@@ -124,6 +157,7 @@ export function GamePage() {
   const closePanel = useCallback(() => setActivePanel(null), []);
   const openInventory = useCallback(() => setActivePanel('inventory'), []);
   const openCharacter = useCallback(() => setActivePanel('character'), []);
+  const openOptions = useCallback(() => setActivePanel('options'), []);
 
   // Show loading state
   if (isLoading) {
@@ -186,6 +220,7 @@ export function GamePage() {
           snapshot={characterSnapshot}
           onInventoryClick={openInventory}
           onCharacterClick={openCharacter}
+          onOptionsClick={openOptions}
         />
 
         {/* Error toast */}
@@ -267,6 +302,15 @@ export function GamePage() {
       >
         <CharacterSheet character={character} snapshot={characterSnapshot} />
       </PanelOverlay>
+
+      {/* Options Panel */}
+      <OptionsPanel
+        isOpen={activePanel === 'options'}
+        onClose={closePanel}
+        options={options}
+        onOptionsChange={handleOptionsChange}
+        isSaving={isSavingOptions}
+      />
     </div>
   );
 }

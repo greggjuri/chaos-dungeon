@@ -63,6 +63,7 @@ export interface Session {
   current_location: string;
   world_state: Record<string, unknown>;
   message_history: Message[];
+  options?: GameOptions;
   created_at: string;
   updated_at?: string;
 }
@@ -253,6 +254,35 @@ export interface UsageStats {
   global_limit: number;
 }
 
+// ============ Game Options Types ============
+
+/** Gore level preference for violence descriptions */
+export type GoreLevel = 'mild' | 'standard' | 'extreme';
+
+/** Mature content preference for romantic/sexual scenes */
+export type MatureContentLevel = 'fade_to_black' | 'suggestive' | 'explicit';
+
+/** Player game options stored in session */
+export interface GameOptions {
+  confirm_combat_noncombat: boolean;
+  gore_level: GoreLevel;
+  mature_content: MatureContentLevel;
+}
+
+/** Default game options */
+export const DEFAULT_GAME_OPTIONS: GameOptions = {
+  confirm_combat_noncombat: true,
+  gore_level: 'standard',
+  mature_content: 'suggestive',
+};
+
+/** Pending combat confirmation state */
+export interface PendingCombatConfirmation {
+  target: string;
+  original_action: string;
+  reason: string;
+}
+
 /** Full action response from server */
 export interface FullActionResponse {
   narrative: string;
@@ -265,6 +295,7 @@ export interface FullActionResponse {
   character_dead: boolean;
   session_ended: boolean;
   usage?: UsageStats;
+  pending_confirmation?: boolean;
 }
 
 /** Response when token limits are reached */

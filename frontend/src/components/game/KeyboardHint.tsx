@@ -15,7 +15,7 @@ export function KeyboardHint({ visible }: KeyboardHintProps) {
 
   return (
     <div className="fixed bottom-2 left-1/2 -translate-x-1/2 z-30 text-gray-600 text-xs pointer-events-none">
-      I Inventory · C Character · Esc Close
+      I Inventory · C Character · O Options · Esc Close
     </div>
   );
 }

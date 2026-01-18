@@ -1,7 +1,14 @@
 """Dynamic context builder for the DM."""
 
 from shared.items import ITEM_CATALOG
-from shared.models import Character, Message, MessageRole, Session
+from shared.models import (
+    Character,
+    GameOptions,
+    Message,
+    MessageRole,
+    PendingCombatConfirmation,
+    Session,
+)
 from shared.utils import calculate_modifier
 
 from .system_prompt import build_system_prompt
@@ -34,6 +41,8 @@ class DMPromptBuilder:
         session: Session,
         session_data: dict | None = None,
         action: str = "",
+        options: GameOptions | None = None,
+        pending_confirmation: PendingCombatConfirmation | None = None,
     ) -> str:
         """Build the dynamic context section (~500-800 tokens).
 
@@ -41,14 +50,18 @@ class DMPromptBuilder:
         - Character stats block
         - Current location and world state
         - Recent message history (last 10 messages)
+        - Player options (gore level, mature content)
         - Pending loot info (if any)
         - Commerce context (if buy/sell action detected)
+        - Pending combat confirmation (if awaiting confirm)
 
         Args:
             character: Current player character
             session: Current game session
             session_data: Optional raw session dict for pending_loot access
             action: Player action text for commerce detection
+            options: Player's game options for content preferences
+            pending_confirmation: Pending attack confirmation state
 
         Returns:
             Context string to append after system prompt
@@ -58,6 +71,14 @@ class DMPromptBuilder:
             self._format_world_state(session),
             self._format_message_history(session.message_history),
         ]
+
+        # Add options context if provided
+        if options:
+            parts.append(self._format_options_context(options))
+
+        # Add pending confirmation context (takes priority over other contexts)
+        if pending_confirmation:
+            parts.append(self._format_pending_confirmation(pending_confirmation))
 
         # Add loot context if there's pending loot
         if session_data:
@@ -290,3 +311,54 @@ Do NOT invent items or gold - the server controls all acquisition."""
             lines.append("- potion_healing: 50 gold")
 
         return "\n".join(lines)
+
+    def _format_options_context(self, options: GameOptions) -> str:
+        """Format player options for DM context.
+
+        Instructs the DM on how to adjust narration based on
+        gore level and mature content preferences.
+
+        Args:
+            options: Player's game options
+
+        Returns:
+            Formatted options context block
+        """
+        gore = options.gore_level.value.upper()
+        mature = options.mature_content.value.upper().replace("_", " ")
+
+        return f"""## PLAYER OPTIONS
+- Gore level: {gore}
+- Mature content: {mature}
+
+Adjust your narration style according to these preferences:
+
+GORE LEVEL:
+- MILD: Describe violence outcomes without graphic detail. "You defeat him" not "blood sprays"
+- STANDARD: Moderate gore, visceral but not excessive. Blood, wounds, death described.
+- EXTREME: Full graphic detail. Describe injuries, gore, viscera explicitly.
+
+MATURE CONTENT:
+- FADE TO BLACK: Cut away from romantic/sexual scenes. "The night passes..."
+- SUGGESTIVE: Sensual descriptions, tension, but no explicit acts
+- EXPLICIT: Full adult content permitted, describe acts explicitly"""
+
+    def _format_pending_confirmation(
+        self, pending: PendingCombatConfirmation
+    ) -> str:
+        """Format pending combat confirmation context.
+
+        Instructs the DM to ask the player to confirm attacking
+        a non-hostile target before combat is initiated.
+
+        Args:
+            pending: Pending combat confirmation state
+
+        Returns:
+            Formatted pending confirmation context block
+        """
+        return f"""## PENDING COMBAT CONFIRMATION
+The player wants to attack "{pending.target}", but they are non-hostile.
+Ask the player to confirm: describe the target, note they're not threatening,
+ask "Are you sure you want to attack?"
+Do NOT initiate combat. Wait for player's response."""

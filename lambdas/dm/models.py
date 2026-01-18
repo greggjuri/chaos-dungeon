@@ -439,3 +439,6 @@ class ActionResponse(BaseModel):
 
     usage: UsageStats | None = None
     """Token usage statistics (for debugging/monitoring)."""
+
+    pending_confirmation: bool = False
+    """True if awaiting player confirmation (e.g., attack non-hostile)."""

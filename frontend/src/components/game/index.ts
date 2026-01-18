@@ -15,6 +15,7 @@ export { DiceRoll } from './DiceRoll';
 export { EnemyCard } from './EnemyCard';
 export { InventoryPanel } from './InventoryPanel';
 export { KeyboardHint } from './KeyboardHint';
+export { OptionsPanel } from './OptionsPanel';
 export { PanelOverlay } from './PanelOverlay';
 export { StateChangeSummary } from './StateChangeSummary';
 export { TokenCounter } from './TokenCounter';

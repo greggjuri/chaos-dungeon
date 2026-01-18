@@ -24,6 +24,39 @@ class MessageRole(str, Enum):
     DM = "dm"
 
 
+class GoreLevel(str, Enum):
+    """Gore level preference for violence descriptions."""
+
+    MILD = "mild"
+    STANDARD = "standard"
+    EXTREME = "extreme"
+
+
+class MatureContentLevel(str, Enum):
+    """Mature content preference for romantic/sexual scenes."""
+
+    FADE_TO_BLACK = "fade_to_black"
+    SUGGESTIVE = "suggestive"
+    EXPLICIT = "explicit"
+
+
+class GameOptions(BaseModel):
+    """Player game options stored in session."""
+
+    confirm_combat_noncombat: bool = True
+    gore_level: GoreLevel = GoreLevel.STANDARD
+    mature_content: MatureContentLevel = MatureContentLevel.SUGGESTIVE
+
+
+class PendingCombatConfirmation(BaseModel):
+    """Pending attack confirmation for non-hostile target."""
+
+    target: str
+    original_action: str
+    reason: str = "non-hostile"
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+
 class AbilityScores(BaseModel):
     """D&D ability scores (3-18 range)."""
 
@@ -124,6 +157,8 @@ class Session(BaseModel):
     current_location: str = Field(default="Unknown")
     world_state: dict[str, Any] = Field(default_factory=dict)
     message_history: list[Message] = Field(default_factory=list)
+    options: GameOptions = Field(default_factory=GameOptions)
+    pending_combat_confirmation: PendingCombatConfirmation | None = None
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     updated_at: str | None = None
 
@@ -161,6 +196,14 @@ class Session(BaseModel):
         session_id = item["SK"].replace("SESS#", "")
         # Convert message history from dict format
         message_history = [Message(**msg) for msg in item.get("message_history", [])]
+        # Convert options from dict format
+        options_data = item.get("options", {})
+        options = GameOptions(**options_data) if options_data else GameOptions()
+        # Convert pending combat confirmation
+        pending_data = item.get("pending_combat_confirmation")
+        pending_confirmation = (
+            PendingCombatConfirmation(**pending_data) if pending_data else None
+        )
         return cls(
             user_id=user_id,
             session_id=session_id,
@@ -169,6 +212,8 @@ class Session(BaseModel):
             current_location=item.get("current_location", "Unknown"),
             world_state=item.get("world_state", {}),
             message_history=message_history,
+            options=options,
+            pending_combat_confirmation=pending_confirmation,
             created_at=item.get("created_at"),
             updated_at=item.get("updated_at"),
         )

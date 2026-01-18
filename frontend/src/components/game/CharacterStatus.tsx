@@ -1,7 +1,7 @@
 /**
  * Character status bar component.
  */
-import { Package, User } from 'lucide-react';
+import { Package, Settings, User } from 'lucide-react';
 import { Character, CharacterSnapshot, CharacterClass } from '../../types';
 
 interface Props {
@@ -9,6 +9,7 @@ interface Props {
   snapshot: CharacterSnapshot | null;
   onInventoryClick?: () => void;
   onCharacterClick?: () => void;
+  onOptionsClick?: () => void;
 }
 
 const CLASS_DISPLAY: Record<CharacterClass, string> = {
@@ -39,6 +40,7 @@ export function CharacterStatus({
   snapshot,
   onInventoryClick,
   onCharacterClick,
+  onOptionsClick,
 }: Props) {
   // Use snapshot values if available, fall back to character
   const hp = snapshot?.hp ?? character.hp;
@@ -114,6 +116,14 @@ export function CharacterStatus({
               aria-label="Open character sheet"
             >
               <User size={18} />
+            </button>
+            <button
+              onClick={onOptionsClick}
+              className="text-gray-500 hover:text-gray-300 transition-colors p-1"
+              title="Options (O)"
+              aria-label="Open game options"
+            >
+              <Settings size={18} />
             </button>
           </div>
         </div>
