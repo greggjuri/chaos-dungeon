@@ -521,12 +521,44 @@ class DMService:
             )
 
             if response_type == "confirm":
-                # Clear pending and process original action
+                # Clear pending and process original action through COMBAT system
                 session["pending_combat_confirmation"] = None
                 action = pending_confirmation.original_action
+                target = pending_confirmation.target
                 skip_hostility_check = True  # Don't re-check, player already confirmed!
-                logger.info("Combat confirmed, processing original action")
-                # Fall through to normal processing with original action
+
+                logger.info(
+                    "COMBAT_CONFIRM: Processing confirmed attack",
+                    extra={
+                        "original_action": action,
+                        "target": target,
+                        "session_id": session_id,
+                    }
+                )
+
+                # CRITICAL: Initiate combat with the NPC BEFORE processing action
+                # This ensures the attack goes through the combat system, not DM interpretation
+                if not session.get("combat_state", {}).get("active"):
+                    self._initiate_combat_with_npc(session, target)
+
+                # Now process the attack through combat system (not normal action)
+                response = self._process_combat_action(
+                    session, character, action, user_id, session_id, combat_action=None
+                )
+
+                # Save updates and return
+                now = datetime.now(UTC).isoformat()
+                character["updated_at"] = now
+                session["updated_at"] = now
+                char_data = convert_floats_to_decimal(
+                    {k: v for k, v in character.items() if k not in ("PK", "SK")}
+                )
+                session_data = convert_floats_to_decimal(
+                    {k: v for k, v in session.items() if k not in ("PK", "SK")}
+                )
+                self.db.put_item(char_pk, char_sk, char_data)
+                self.db.put_item(session_pk, session_sk, session_data)
+                return response
             elif response_type == "cancel":
                 # Clear pending, narrate cancellation
                 session["pending_combat_confirmation"] = None
@@ -1800,6 +1832,61 @@ class DMService:
             character_dead=character_dead,
             session_ended=session_ended,
             usage=usage_stats,
+        )
+
+    def _initiate_combat_with_npc(self, session: dict, npc_name: str) -> None:
+        """Spawn an NPC as a combat enemy for player-initiated attacks on non-hostiles.
+
+        Creates a generic "commoner" type enemy for non-hostile NPCs like
+        villagers, merchants, guards, etc. Uses weak stats since these aren't
+        trained combatants.
+
+        Args:
+            session: Session dict to update with combat state
+            npc_name: Name/description of the NPC target
+        """
+        # Clear any unclaimed loot from previous combat
+        if session.get("pending_loot"):
+            logger.info(
+                "Unclaimed loot lost on new combat with NPC",
+                extra={"loot": session["pending_loot"]}
+            )
+            session["pending_loot"] = None
+
+        # Use generic "commoner" stats for non-hostile NPCs
+        # These are weak because they're not trained fighters
+        npc_enemy = {
+            "id": str(uuid4()),
+            "name": npc_name.title() if npc_name else "Commoner",
+            "hp": 4,           # Commoners have ~1d4 HP
+            "max_hp": 4,
+            "ac": 10,          # No armor
+            "attack_bonus": 0,  # Untrained
+            "damage_dice": "1d4",  # Improvised weapon or fists
+            "xp_value": 5,     # Minimal XP for attacking innocents
+        }
+
+        # Roll initiative - player gets surprise bonus for ambushing
+        player_init, _ = roll_dice_notation("1d6")
+        player_init += 2  # Surprise bonus for attacking non-hostile
+        enemy_init, _ = roll_dice_notation("1d6")
+
+        session["combat_state"] = {
+            "active": True,
+            "round": 0,
+            "player_initiative": player_init,
+            "enemy_initiative": enemy_init,
+        }
+        session["combat_enemies"] = [npc_enemy]
+
+        logger.info(
+            "COMBAT_INIT: Initiated combat with non-hostile NPC",
+            extra={
+                "npc_name": npc_name,
+                "enemy_stats": npc_enemy,
+                "player_init": player_init,
+                "enemy_init": enemy_init,
+            }
         )
 
     def _initiate_combat(self, session: dict, enemies: list[Enemy]) -> None:
