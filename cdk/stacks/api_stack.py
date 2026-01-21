@@ -358,6 +358,10 @@ class ChaosApiStack(Stack):
         history = session.add_resource("history")
         history.add_method("GET", session_integration)
 
+        # /sessions/{sessionId}/options endpoint
+        options = session.add_resource("options")
+        options.add_method("PATCH", session_integration)
+
         return api
 
     def _create_outputs(self) -> None:
