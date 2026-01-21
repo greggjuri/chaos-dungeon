@@ -333,7 +333,8 @@ class DMService:
             # Record usage
             usage_stats = self._record_usage(session_id, ai_response)
 
-            narrative = ai_response.text.strip()
+            # Clean the response to remove any JSON blocks the DM might output
+            narrative = clean_narrator_output(ai_response.text)
         except Exception as e:
             logger.warning(f"Failed to generate confirmation narrative: {e}")
             narrative = (
@@ -490,6 +491,20 @@ class DMService:
         options_data = session.get("options", {})
         game_options = GameOptions(**options_data) if options_data else GameOptions()
 
+        # Debug logging for options
+        logger.info(
+            "Processing action with options",
+            extra={
+                "session_id": session_id,
+                "confirm_combat": game_options.confirm_combat_noncombat,
+                "gore_level": game_options.gore_level.value,
+                "options_raw": options_data,
+            },
+        )
+
+        # Flag to skip hostility check when player has already confirmed
+        skip_hostility_check = False
+
         # Check for pending confirmation
         pending_data = session.get("pending_combat_confirmation")
         if pending_data:
@@ -509,6 +524,7 @@ class DMService:
                 # Clear pending and process original action
                 session["pending_combat_confirmation"] = None
                 action = pending_confirmation.original_action
+                skip_hostility_check = True  # Don't re-check, player already confirmed!
                 logger.info("Combat confirmed, processing original action")
                 # Fall through to normal processing with original action
             elif response_type == "cancel":
@@ -544,11 +560,13 @@ class DMService:
         # NON-HOSTILE ATTACK CHECK
         # If attacking a non-hostile target with confirmation enabled,
         # ask the DM to classify and potentially request confirmation
+        # Skip if player already confirmed (skip_hostility_check=True)
         # ================================================================
         if (
             game_options.confirm_combat_noncombat
             and is_attack_action(action)
             and not combat_active
+            and not skip_hostility_check
         ):
             target = extract_attack_target(action)
             if target:

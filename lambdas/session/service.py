@@ -278,16 +278,27 @@ class SessionService:
         if not item:
             raise NotFoundError("Session", session_id)
 
-        # Update options
-        self.db.update_item(pk, sk, {"options": options.model_dump()})
-
+        # Log current options before update
         logger.info(
-            "Session options updated",
+            "Options before update",
             extra={
-                "user_id": user_id,
                 "session_id": session_id,
-                "options": options.model_dump(),
+                "current_options": item.get("options"),
             },
         )
 
-        return {"options": options.model_dump()}
+        # Update options
+        options_dict = options.model_dump()
+        self.db.update_item(pk, sk, {"options": options_dict})
+
+        # Verify the write succeeded
+        updated_item = self.db.get_item(pk, sk)
+        logger.info(
+            "Options after update",
+            extra={
+                "session_id": session_id,
+                "saved_options": updated_item.get("options") if updated_item else None,
+            },
+        )
+
+        return {"options": options_dict}

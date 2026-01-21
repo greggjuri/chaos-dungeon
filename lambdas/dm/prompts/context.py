@@ -361,4 +361,6 @@ MATURE CONTENT:
 The player wants to attack "{pending.target}", but they are non-hostile.
 Ask the player to confirm: describe the target, note they're not threatening,
 ask "Are you sure you want to attack?"
-Do NOT initiate combat. Wait for player's response."""
+
+IMPORTANT: Do NOT initiate combat. Do NOT output any JSON or state_changes block.
+Just ask the confirmation question in narrative form only."""
