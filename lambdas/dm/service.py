@@ -590,13 +590,13 @@ class DMService:
 
         # ================================================================
         # NON-HOSTILE ATTACK CHECK
-        # If attacking a non-hostile target with confirmation enabled,
-        # ask the DM to classify and potentially request confirmation
+        # If attacking a non-hostile target, either:
+        # - Ask for confirmation (if confirm_combat_noncombat is ON)
+        # - Initiate combat immediately (if confirm_combat_noncombat is OFF)
         # Skip if player already confirmed (skip_hostility_check=True)
         # ================================================================
         if (
-            game_options.confirm_combat_noncombat
-            and is_attack_action(action)
+            is_attack_action(action)
             and not combat_active
             and not skip_hostility_check
         ):
@@ -612,26 +612,53 @@ class DMService:
                 )
 
                 if not is_hostile:
-                    # Set pending confirmation and return confirmation request
-                    session["pending_combat_confirmation"] = {
-                        "target": target,
-                        "original_action": action,
-                        "reason": "non-hostile",
-                        "created_at": datetime.now(UTC).isoformat(),
-                    }
+                    if game_options.confirm_combat_noncombat:
+                        # Confirm ON: Ask for confirmation first
+                        session["pending_combat_confirmation"] = {
+                            "target": target,
+                            "original_action": action,
+                            "reason": "non-hostile",
+                            "created_at": datetime.now(UTC).isoformat(),
+                        }
 
-                    response = self._request_combat_confirmation(
-                        session, character, target, game_options, user_id, session_id
-                    )
+                        response = self._request_combat_confirmation(
+                            session, character, target, game_options, user_id, session_id
+                        )
 
-                    # Save updates and return
-                    now = datetime.now(UTC).isoformat()
-                    session["updated_at"] = now
-                    session_data = convert_floats_to_decimal(
-                        {k: v for k, v in session.items() if k not in ("PK", "SK")}
-                    )
-                    self.db.put_item(session_pk, session_sk, session_data)
-                    return response
+                        # Save updates and return
+                        now = datetime.now(UTC).isoformat()
+                        session["updated_at"] = now
+                        session_data = convert_floats_to_decimal(
+                            {k: v for k, v in session.items() if k not in ("PK", "SK")}
+                        )
+                        self.db.put_item(session_pk, session_sk, session_data)
+                        return response
+                    else:
+                        # Confirm OFF: Skip confirmation, initiate combat immediately
+                        logger.info(
+                            "Confirm OFF: Initiating combat with non-hostile immediately",
+                            extra={"target": target},
+                        )
+                        self._initiate_combat_with_npc(session, target)
+
+                        # Process through combat system
+                        response = self._process_combat_action(
+                            session, character, action, user_id, session_id, combat_action=None
+                        )
+
+                        # Save updates and return
+                        now = datetime.now(UTC).isoformat()
+                        character["updated_at"] = now
+                        session["updated_at"] = now
+                        char_data = convert_floats_to_decimal(
+                            {k: v for k, v in character.items() if k not in ("PK", "SK")}
+                        )
+                        session_data = convert_floats_to_decimal(
+                            {k: v for k, v in session.items() if k not in ("PK", "SK")}
+                        )
+                        self.db.put_item(char_pk, char_sk, char_data)
+                        self.db.put_item(session_pk, session_sk, session_data)
+                        return response
 
         # Normal processing path
         if combat_active:
